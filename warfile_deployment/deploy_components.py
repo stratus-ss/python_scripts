@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # Owner: Steve Ovens
 # Date Created: July 2015
-# Primary Function: This is intended to be used to deploy components. Currently it only deploys warfiles
+# Primary Function: This is intended to be used to deploy autodata components. Currently it only deploys warfiles
 # but it is modular enough to also deploy jarfiles as required.
 # Log Location: Logging dumps to stdout
 # Script notes: This script is the main callable during deployments. This deployment process includes:
@@ -18,8 +18,8 @@ import time
 import socket
 import operator
 
-# This is important because we need to import some other python libraries
-python_module_path = '/usr/local/scripts/python/'
+# This is important because we need to import some other Autodata python libraries
+python_module_path = '/usr/local/ops/scripts/python/'
 sys.path.append(python_module_path)
 
 from deploy_commands import DetermineHowToRestartTomcat, WhichLocalWarfilesToDeploy, CurlWarfile
@@ -28,6 +28,7 @@ from deployment_parameters import ParseDeploymentParameters
 from ssh_connection_handling import HandleSSHConnections
 from get_versions import GenericServerType
 from purge_akamai import PurgeAkamai
+from nagios_downtime_handler import DownTimeHandler
 ImportHelper.import_error_handling("paramiko", globals())
 
 class ServerDeployedTo(GenericServerType):
@@ -111,6 +112,12 @@ configuration_counter = 0
 for config_file in local_predeployed_components_list:
     sorted_servers_names_to_deploy_to = convert_to_sorted_tuple(config_file, sub_dictionary="component_to_server_map")
     server_counter = 0
+    nagios_downtime_duration = deployment_parameters[configuration_counter].nagios_downtime_duration
+    nagios_put_in_downtime = deployment_parameters[configuration_counter].nagios_put_in_downtime
+    nagios_remove_from_downtime = deployment_parameters[configuration_counter].nagios_remove_from_downtime
+    nagios_server = deployment_parameters[configuration_counter].nagios_server
+    nagios_user = deployment_parameters[configuration_counter].nagios_user
+    nagios_password = deployment_parameters[configuration_counter].nagios_password
     for deployment in sorted_servers_names_to_deploy_to:
         server_name = sorted_servers_names_to_deploy_to[server_counter][0]
         warfile_list = sorted_servers_names_to_deploy_to[server_counter][1]
@@ -119,6 +126,12 @@ for config_file in local_predeployed_components_list:
             continue
         else:
             continue_with_deploy = True
+            if "yes" in nagios_put_in_downtime.lower():
+                print("\nAttempting to put %s in downtime on nagios server: %s" % (server_name, nagios_server))
+                DownTimeHandler.put_host_in_downtime(username=nagios_user, password=nagios_password,
+                                                     nagios_server=nagios_server, hostname=server_name.split(".")[0],
+                                                     minutes_in_downtime=nagios_downtime_duration)
+                time.sleep(5)
             ssh_connection = HandleSSHConnections()
             ssh_connection.open_ssh(server_name, deployment_parameters[configuration_counter].ssh_user)
             for individual_warfile in warfile_list:
@@ -218,6 +231,7 @@ for individual_component_dict in local_predeployed_components_list:
                 warfile_printable_info = deployment_parameters[component_counter].warfile_path + os.sep + each_warfile
                 print("\t" + warfile_printable_info)
         else:
+            warfile_list.sort()
             for files in warfile_list:
                 md5sum = os.popen("md5sum %s" % files).read().split()[0]
                 print("\t%s: \t%s" % (files, md5sum))
@@ -238,12 +252,28 @@ for server_mapping in sorted_servers_deployed_to:
 
 print("=======================================")
 for config_number, warfile_list in already_deployed_warfiles.items():
+    if "yes" in deployment_parameters[config_number].nagios_remove_from_downtime:
+        nagios_user = deployment_parameters[config_number].nagios_user
+        nagios_password = deployment_parameters[config_number].nagios_password
+        nagios_server = deployment_parameters[config_number].nagios_server
+        for host in deployment_parameters[config_number].server_list:
+            hostname_in_nagios = host.split(".")[0]
+            print("\nRemoving %s from downtime" % hostname_in_nagios)
+            DownTimeHandler.remove_host_from_downtime(username=nagios_user, password=nagios_password,
+                                                      nagios_server=nagios_server, hostname=hostname_in_nagios)
+
+print("=======================================")
+
+for config_number, warfile_list in already_deployed_warfiles.items():
     if "y" in deployment_parameters[config_number].move_file:
         move_warfile = ServerDeployedTo(warfile_list)
         for each_warfile in move_warfile.found_manifest_version:
             warfile_full_path = deployment_parameters[config_number].warfile_path + os.sep + each_warfile
             warfile_name = each_warfile.split(": ")[0]
-            warfile_version = each_warfile.split(": ")[1]
+            if not "filename not matched" in move_warfile.found_manifest_version:
+                warfile_version = each_warfile.split(": ")[1]
+            else:
+                warfile_version = ""
             print("Moving \t%s to %s" % (warfile_name,
                                          deployment_parameters[config_number].old_warfile_path))
             CleanUp.move_warfiles_to_backup_location(warfile_full_path.split(":")[0],
@@ -252,8 +282,10 @@ for config_number, warfile_list in already_deployed_warfiles.items():
     if hasattr(deployment_parameters[config_number], "akamai_cred_file"):
         run_the_purge = PurgeAkamai(deployment_parameters[config_number].akamai_cred_file,
                                     deployment_parameters[config_number].cpcode_file)
-    for files in os.listdir(deployment_parameters[config_number].warfile_path):
-        full_path = deployment_parameters[config_number].warfile_path + os.sep + files
-        if os.path.isfile(full_path):
-            print("Moving \t%s to %s" % (full_path, deployment_parameters[config_number].old_warfile_path))
-            CleanUp.move_warfiles_to_backup_location(full_path, deployment_parameters[config_number].old_warfile_path)
+    for warfile_in_deployment_dir in os.listdir(deployment_parameters[config_number].warfile_path):
+        for deployed_warfile in warfile_list:
+            if warfile_in_deployment_dir in deployed_warfile:
+                full_path = deployment_parameters[config_number].warfile_path + os.sep + warfile_in_deployment_dir
+                if os.path.isfile(full_path):
+                    print("Moving \t%s to %s" % (full_path, deployment_parameters[config_number].old_warfile_path))
+                    CleanUp.move_warfiles_to_backup_location(full_path, deployment_parameters[config_number].old_warfile_path)

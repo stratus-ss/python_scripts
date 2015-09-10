@@ -42,17 +42,23 @@ class ParseDeploymentParameters:
                 self.tomcatuser = value
             elif line.startswith("TOMCATPASS"):
                 self.tomcatpass = value
-            elif line.startswith("NAG_START"):
-                self.nag_start = value
-            elif line.startswith("NAG_STOP"):
-                self.nag_stop = value
+            elif line.startswith("NAGIOS_PUT_IN_DOWNTIME"):
+                self.nagios_put_in_downtime = value
+            elif line.startswith("NAGIOS_REMOVE_FROM_DOWNTIME"):
+                self.nagios_remove_from_downtime = value
+            elif line.startswith("NAGIOS_DOWNTIME_REMOVAL_DELAY"):
+                self.nagios_downtime_removal_delay = value
+            elif line.startswith("NAGIOS_DOWNTIME_DURATION"):
+                self.nagios_downtime_duration = value
             elif line.startswith("NAGIOS_SERVER"):
                 self.nagios_server = value
+            elif line.startswith("NAGIOS_USER"):
+                self.nagios_user = value
+            elif line.startswith("NAGIOS_PASSWORD"):
+                self.nagios_password = value
             elif line.startswith("TOMCAT_DIRECTORY"):
                 self.tomcat_directory = value
             elif line.startswith("CPCODE_FILE"):
                 self.cpcode_file = value
             elif line.startswith("AKAMAI_CRED_FILE"):
                 self.akamai_cred_file = value
-
-
