@@ -110,14 +110,25 @@ continue_with_deploy = False
 
 configuration_counter = 0
 for config_file in local_predeployed_components_list:
+    # This flag is set to false in the event that nagios information is not set in the config file.
+    skip_nagios = False
     sorted_servers_names_to_deploy_to = convert_to_sorted_tuple(config_file, sub_dictionary="component_to_server_map")
     server_counter = 0
-    nagios_downtime_duration = deployment_parameters[configuration_counter].nagios_downtime_duration
-    nagios_put_in_downtime = deployment_parameters[configuration_counter].nagios_put_in_downtime
-    nagios_remove_from_downtime = deployment_parameters[configuration_counter].nagios_remove_from_downtime
-    nagios_server = deployment_parameters[configuration_counter].nagios_server
-    nagios_user = deployment_parameters[configuration_counter].nagios_user
-    nagios_password = deployment_parameters[configuration_counter].nagios_password
+    # Attempt to parse out nagios information from the configuration files
+    try:
+        nagios_downtime_duration = deployment_parameters[configuration_counter].nagios_downtime_duration
+        nagios_put_in_downtime = deployment_parameters[configuration_counter].nagios_put_in_downtime
+        nagios_remove_from_downtime = deployment_parameters[configuration_counter].nagios_remove_from_downtime
+        nagios_server = deployment_parameters[configuration_counter].nagios_server
+        nagios_user = deployment_parameters[configuration_counter].nagios_user
+        nagios_password = deployment_parameters[configuration_counter].nagios_password
+    except (NameError, AttributeError):
+        # If we get a NameError it is likely that some nagios information is undefined and therefor we want to skip
+        # any nagios interaction
+        skip_nagios = True
+        print("There was a problem parsing out nagios information for hosts in %s. "
+              "Nagios downtime WILL NOT be set during this deploy" %
+              sorted_servers_names_to_deploy_to[server_counter][0])
     for deployment in sorted_servers_names_to_deploy_to:
         server_name = sorted_servers_names_to_deploy_to[server_counter][0]
         warfile_list = sorted_servers_names_to_deploy_to[server_counter][1]
@@ -126,12 +137,14 @@ for config_file in local_predeployed_components_list:
             continue
         else:
             continue_with_deploy = True
-            if "yes" in nagios_put_in_downtime.lower():
-                print("\nAttempting to put %s in downtime on nagios server: %s" % (server_name, nagios_server))
-                DownTimeHandler.put_host_in_downtime(username=nagios_user, password=nagios_password,
-                                                     nagios_server=nagios_server, hostname=server_name.split(".")[0],
-                                                     minutes_in_downtime=nagios_downtime_duration)
-                time.sleep(5)
+            if skip_nagios == False:
+                if "yes" in nagios_put_in_downtime.lower():
+                    print("\nAttempting to put %s in downtime on nagios server: %s" % (server_name, nagios_server))
+                    DownTimeHandler.put_host_in_downtime(username=nagios_user, password=nagios_password,
+                                                         nagios_server=nagios_server, hostname=server_name.split(".")[0],
+                                                         minutes_in_downtime=nagios_downtime_duration)
+                    # Put in a delay to allow nagios time to properly register the down time
+                    time.sleep(8)
             ssh_connection = HandleSSHConnections()
             ssh_connection.open_ssh(server_name, deployment_parameters[configuration_counter].ssh_user)
             for individual_warfile in warfile_list:
@@ -252,15 +265,22 @@ for server_mapping in sorted_servers_deployed_to:
 
 print("=======================================")
 for config_number, warfile_list in already_deployed_warfiles.items():
-    if "yes" in deployment_parameters[config_number].nagios_remove_from_downtime:
-        nagios_user = deployment_parameters[config_number].nagios_user
-        nagios_password = deployment_parameters[config_number].nagios_password
-        nagios_server = deployment_parameters[config_number].nagios_server
-        for host in deployment_parameters[config_number].server_list:
-            hostname_in_nagios = host.split(".")[0]
-            print("\nRemoving %s from downtime" % hostname_in_nagios)
-            DownTimeHandler.remove_host_from_downtime(username=nagios_user, password=nagios_password,
-                                                      nagios_server=nagios_server, hostname=hostname_in_nagios)
+    try:
+        if "yes" in deployment_parameters[config_number].nagios_remove_from_downtime:
+            nagios_user = deployment_parameters[config_number].nagios_user
+            nagios_password = deployment_parameters[config_number].nagios_password
+            nagios_server = deployment_parameters[config_number].nagios_server
+            for host in deployment_parameters[config_number].server_list:
+                hostname_in_nagios = host.split(".")[0]
+                print("\nRemoving %s from downtime" % hostname_in_nagios)
+                DownTimeHandler.remove_host_from_downtime(username=nagios_user, password=nagios_password,
+                                                              nagios_server=nagios_server, hostname=hostname_in_nagios)
+    except (NameError, AttributeError):
+        # If we get a NameError it is likely that some nagios information is undefined and therefor we want to skip
+        # any nagios interaction
+        print("There was a problem attempting to take the following server(s) %s out of downtime. "
+              "It is likely information is missing in the deployment configuration."
+              % deployment_parameters[config_number].server_list)
 
 print("=======================================")
 
