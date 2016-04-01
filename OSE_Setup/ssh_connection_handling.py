@@ -5,17 +5,16 @@
 # Dependencies: helper_functions.py
 
 class HandleSSHConnections:
-    """This class allows for easier multiple connections. The problem is because /etc/init.d/tomcat restart
-    Sometimes does not wait long enough between stop and start functions. As a result, tomcat may stay down
-    To remedy this, this class will open multiple connections inserting a 20 second pause between connections
-    Hopefully this will allow most instances of tomcat to shutdown gracefully before restarting """
+    """This class allows for easier multiple connections. It also handles running remote commands """
     from helper_functions import ImportHelper
     ImportHelper.import_error_handling("paramiko", globals())
     ImportHelper.import_error_handling("time", globals())
 
+    def __init__(self):
+        self.ssh = paramiko.SSHClient()
+
     def open_ssh(self, server, user_name):
         if not self.ssh_is_connected():
-            self.ssh = paramiko.SSHClient()
             self.ssh.load_system_host_keys()
             self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh.connect(server, username=user_name, timeout=120)
@@ -32,5 +31,11 @@ class HandleSSHConnections:
             time.sleep(2)
 
     def ssh_is_connected(self):
-        transport = self._ssh.get_transport() if self._ssh else None
+        transport = self.ssh.get_transport() if self.ssh else None
         return transport and transport.is_active()
+
+    @staticmethod
+    def run_remote_commands(ssh_object, command):
+        stdin, stdout, stderr = ssh_object.ssh.exec_command(command)
+        temp_list = stdout.readlines()
+        return(temp_list)
