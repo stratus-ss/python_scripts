@@ -220,11 +220,11 @@ def package_query(server_name, dict_to_modify, package_list):
             ose_required_packages_installed.append(package)
         else:
             ose_required_packages_not_installed.append(package)
-    DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Installed",
-                                         ose_required_packages_installed)
-    DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Missing",
+    if len(package_list) != len(ose_required_packages_installed):
+        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Missing",
                                          ose_required_packages_not_installed)
-
+    else:
+        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "All Packages Installed", True)
 
 if __name__ == "__main__":
     if options.ansible_host_file is None:
@@ -241,10 +241,10 @@ if __name__ == "__main__":
             systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
             is_docker_enabled(server, systemctl_output, docker_service_check_dict)
             is_docker_running(server, systemctl_output, docker_service_check_dict)
-            #repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
-            #sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
-            #is_host_subscribed(server, subscription_dict, sub_status)
-            #which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
+            repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
+            sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
+            is_host_subscribed(server, subscription_dict, sub_status)
+            which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
             package_query(server, repo_dict, ose_required_packages_list)
             ssh_connection.close_ssh()
         check_forward_dns_lookup(server, forward_lookup_dict)
