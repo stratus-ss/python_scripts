@@ -29,15 +29,32 @@ subscription_dict = {}
 ose_package_installed_dict = {}
 ose_package_not_installed_dict = {}
 ssh_connection = HandleSSHConnections()
+selinux_dict = {}
 
 ose_required_packages_list = ["wget", "git", "net-tools", "bind-utils", "iptables-services", "bridge-utils",
                               "bash-completion", "atomic-openshift-utils", "docker"]
 ose_repos = ["rhel-7-server-rpms", "rhel-7-server-extras-rpms", "rhel-7-server-ose-3.1-rpms"]
 
-
+docker_file_hashes = {"/etc/sysconfig/docker": "1fe04a24430eaefb751bf720353e730aec5641529f0a3b2567f72e6c63433e8b",
+                 "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
+            "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
 parser = OptionParser()
 parser.add_option('--ansible-host-file', dest='ansible_host_file', help='Specify location of ansible hostfile')
 (options, args) = parser.parse_args()
+
+
+def is_selinux_enabled(host, ssh_obj, dict_to_modify):
+    """
+    is_selinux_enabled logs into the remote host and runs/parses 'sestatus'
+    adds results to a dictionary
+    """
+    output = HandleSSHConnections.run_remote_commands(ssh_obj, "sestatus")
+    for line in output:
+        if "SELinux status" in line:
+            if "enabled" in line:
+                DictionaryHandling.add_to_dictionary(dict_to_modify, host, "SELinux Enabled", True)
+            else:
+                DictionaryHandling.add_to_dictionary(dict_to_modify, host, "SELinux Enabled", False)
 
 
 def process_host_file(ansible_host_file):
@@ -114,18 +131,21 @@ def check_reverse_dns_lookup(lookup_dict, dict_to_modify):
             DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "PTR Record", None)
 
 
-def check_docker_files(host, ssh_obj, dict_to_modify):
+def check_docker_files(host, ssh_obj, dict_to_modify, dict_to_compare):
     """
     check_docker_files assumes there is already a paramiko connection made to the server in question
     It attempts to take a sha256sum of the files in file_list
     """
-    file_list = ["/etc/sysconfig/docker", "/etc/sysconfig/docker-storage", "/etc/sysconfig/docker-storage-setup"]
-    for files in file_list:
+    for files in dict_to_compare.keys():
         try:
             temp_list = HandleSSHConnections.run_remote_commands(ssh_obj, "sha256sum %s" % files)
             for line in temp_list:
-                if line.strip():
-                    DictionaryHandling.add_to_dictionary(dict_to_modify, host, files, line.split()[0])
+                if line.strip().split()[0] == dict_to_compare[files]:
+                    DictionaryHandling.add_to_dictionary(dict_to_modify, host, "%s modified" %
+                                                         files.split("/")[-1], False)
+                else:
+                    DictionaryHandling.add_to_dictionary(dict_to_modify, host, "%s modified" %
+                                                         files.split("/")[-1], True)
         except socket.error:
             print("No SSH connection is open")
 
@@ -202,7 +222,6 @@ def which_repos_are_enabled(server_name, dict_to_modify, repo_info, these_should
                 DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, repo_name, enabled)
 
 
-
 def package_query(server_name, dict_to_modify, package_list):
     """
     package_query uses the yum module to determine if packages exist on the remote system
@@ -237,7 +256,8 @@ if __name__ == "__main__":
         can_connect_to_server = test_ssh_keys(server, ansible_ssh_user)
         if can_connect_to_server:
             ssh_connection.open_ssh(server, ansible_ssh_user)
-            check_docker_files(server, ssh_connection, docker_file_dict)
+            check_docker_files(server, ssh_connection, docker_file_dict, docker_file_hashes)
+            is_selinux_enabled(server, ssh_connection, selinux_dict)
             systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
             is_docker_enabled(server, systemctl_output, docker_service_check_dict)
             is_docker_running(server, systemctl_output, docker_service_check_dict)
@@ -249,6 +269,10 @@ if __name__ == "__main__":
             ssh_connection.close_ssh()
         check_forward_dns_lookup(server, forward_lookup_dict)
         check_reverse_dns_lookup(forward_lookup_dict, reverse_lookup_dict)
+
+
+    print(textColors.HEADER + textColors.BOLD + "\n\nSELinux Checks" + textColors.ENDC)
+    DictionaryHandling.format_dictionary_output(selinux_dict)
 
     print(textColors.HEADER + textColors.BOLD + "\n\nDocker Section (sha256sum below)" + textColors.ENDC)
     DictionaryHandling.format_dictionary_output(docker_file_dict, docker_service_check_dict)

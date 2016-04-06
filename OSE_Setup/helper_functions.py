@@ -14,6 +14,7 @@ class textColors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+    HIGHLIGHT = '\033[96m'
 
 
 class ImportHelper:
@@ -65,7 +66,7 @@ class DictionaryHandling:
                 if server_name in output.split()[0]:
                     if "True" in output:
                         print(textColors.OKGREEN + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                    elif "False" in output or "None" in output or "" in output.split()[:-1]:
+                    elif "False" in output or "None" in output or "" in output.split()[:-1] or "Missing" in output:
                         print(textColors.FAIL + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
                     else:
                         print("\t\t" + " ".join(output.split()[1:]))
