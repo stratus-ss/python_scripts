@@ -20,8 +20,15 @@ import sys
 from optparse import OptionParser
 
 ansible_ssh_user = "root"
-docker_file_dict = {}
+docker_files_have_been_modified_dict = {}
+remote_docker_file_sums_dict = {}
 docker_service_check_dict = {}
+# These may need to be updated occasionally in the event that the default options change
+original_docker_file_hashes = \
+           {"/etc/sysconfig/docker": "1fe04a24430eaefb751bf720353e730aec5641529f0a3b2567f72e6c63433e8b",
+            "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
+            "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
+
 forward_lookup_dict = {}
 reverse_lookup_dict = {}
 repo_dict = {}
@@ -30,16 +37,13 @@ ose_package_installed_dict = {}
 ose_package_not_installed_dict = {}
 ssh_connection = HandleSSHConnections()
 selinux_dict = {}
-
+ose_repos = ["rhel-7-server-rpms", "rhel-7-server-extras-rpms", "rhel-7-server-ose-3.1-rpms"]
 ose_required_packages_list = ["wget", "git", "net-tools", "bind-utils", "iptables-services", "bridge-utils",
                               "bash-completion", "atomic-openshift-utils", "docker"]
-ose_repos = ["rhel-7-server-rpms", "rhel-7-server-extras-rpms", "rhel-7-server-ose-3.1-rpms"]
-
-docker_file_hashes = {"/etc/sysconfig/docker": "1fe04a24430eaefb751bf720353e730aec5641529f0a3b2567f72e6c63433e8b",
-                 "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
-            "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
 parser = OptionParser()
 parser.add_option('--ansible-host-file', dest='ansible_host_file', help='Specify location of ansible hostfile')
+parser.add_option('--show-sha-sums', dest='show_sha_sums', help='Toggle whether or not to show the sha sum of files'
+                                                                'on remote host')
 (options, args) = parser.parse_args()
 
 
@@ -60,15 +64,20 @@ def is_selinux_enabled(host, ssh_obj, dict_to_modify):
 def process_host_file(ansible_host_file):
     # This section should parse the ansible host file for hosts
     # Need a better way to parse the config file
-
+    # I am parsing the host file with a similar format to ini files
     hosts_list = []
     for line in open(ansible_host_file).readlines():
+        # Skip section headings
         if line.startswith("["):
             pass
+        # Skip comments
         elif line.startswith("#"):
             pass
+        # Skip blank lines
         elif not line.strip():
             pass
+        # We don't care about lines doing assignments generally speaking.
+        # There is room for error with this method
         elif "=" in line.split()[0]:
             pass
         else:
@@ -131,7 +140,7 @@ def check_reverse_dns_lookup(lookup_dict, dict_to_modify):
             DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "PTR Record", None)
 
 
-def check_docker_files(host, ssh_obj, dict_to_modify, dict_to_compare):
+def check_docker_files(host, ssh_obj, files_modified_dict, dict_to_compare, remote_sha_sum_dict):
     """
     check_docker_files assumes there is already a paramiko connection made to the server in question
     It attempts to take a sha256sum of the files in file_list
@@ -139,13 +148,19 @@ def check_docker_files(host, ssh_obj, dict_to_modify, dict_to_compare):
     for files in dict_to_compare.keys():
         try:
             temp_list = HandleSSHConnections.run_remote_commands(ssh_obj, "sha256sum %s" % files)
+            shortened_file_name = files.split("/")[-1]
             for line in temp_list:
+                sha_sum = line.split()[0]
                 if line.strip().split()[0] == dict_to_compare[files]:
-                    DictionaryHandling.add_to_dictionary(dict_to_modify, host, "%s modified" %
-                                                         files.split("/")[-1], False)
+                    modified = False
+                    DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
+                                                         shortened_file_name, modified)
                 else:
-                    DictionaryHandling.add_to_dictionary(dict_to_modify, host, "%s modified" %
-                                                         files.split("/")[-1], True)
+                    modified = True
+                    DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
+                                                         shortened_file_name, modified)
+                DictionaryHandling.add_to_dictionary(remote_docker_file_sums_dict, host, "%s sum : %s" % (shortened_file_name,
+                                                                                                    sha_sum), modified)
         except socket.error:
             print("No SSH connection is open")
 
@@ -251,31 +266,48 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit()
 
+    if options.show_sha_sums is None:
+        show_sha_sums = False
+    elif "y" in options.show_sha_sums.lower()[0]:
+        show_sha_sums = True
+    elif "n" in options.show_sha_sums.lower()[0]:
+        show_sha_sums = False
+    else:
+        print("Plesse enter yes/no or y/n to display/hide sha sums")
+        parser.print_help()
+        sys.exit()
+
     ansible_host_list = process_host_file(options.ansible_host_file)
     for server in ansible_host_list:
         can_connect_to_server = test_ssh_keys(server, ansible_ssh_user)
+        # if we can connect to remote host, go ahead and run the verification checks
         if can_connect_to_server:
             ssh_connection.open_ssh(server, ansible_ssh_user)
-            check_docker_files(server, ssh_connection, docker_file_dict, docker_file_hashes)
+            check_docker_files(server, ssh_connection, docker_files_have_been_modified_dict,
+                               original_docker_file_hashes, remote_docker_file_sums_dict)
             is_selinux_enabled(server, ssh_connection, selinux_dict)
             systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
             is_docker_enabled(server, systemctl_output, docker_service_check_dict)
             is_docker_running(server, systemctl_output, docker_service_check_dict)
-            repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
             sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
             is_host_subscribed(server, subscription_dict, sub_status)
+            repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
             which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
             package_query(server, repo_dict, ose_required_packages_list)
             ssh_connection.close_ssh()
         check_forward_dns_lookup(server, forward_lookup_dict)
         check_reverse_dns_lookup(forward_lookup_dict, reverse_lookup_dict)
 
-
+    ##### Format output and display summary
     print(textColors.HEADER + textColors.BOLD + "\n\nSELinux Checks" + textColors.ENDC)
     DictionaryHandling.format_dictionary_output(selinux_dict)
 
     print(textColors.HEADER + textColors.BOLD + "\n\nDocker Section (sha256sum below)" + textColors.ENDC)
-    DictionaryHandling.format_dictionary_output(docker_file_dict, docker_service_check_dict)
+    if show_sha_sums:
+        DictionaryHandling.format_dictionary_output(docker_files_have_been_modified_dict, remote_docker_file_sums_dict,
+                                                docker_service_check_dict)
+    else:
+        DictionaryHandling.format_dictionary_output(docker_files_have_been_modified_dict, docker_service_check_dict)
 
     print(textColors.HEADER + textColors.BOLD + "\n\nDNS Lookups" + textColors.ENDC)
     DictionaryHandling.format_dictionary_output(forward_lookup_dict, reverse_lookup_dict)
