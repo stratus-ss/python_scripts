@@ -517,7 +517,7 @@ if "yes" in copy_docker_storage_file:
 else:
     print("\nThe docker setup has not been completed. Please verify /etc/sysconfig/docker-storage-setup."
           " Once you have set this file you can copy it to all hosts by running: ")
-    print("ansible OSEv3 -m copy -a 'src=%s dest=%s'" % (docker_sysconfig_file, docker_sysconfig_file))
+    print("ansible OSEv3 -m copy -a 'src=%s dest=%s'" % (docker_storage_file, docker_storage_file))
     print("\nTo complete the docker setup, run: ansible OSEv3 -a 'docker-storage-setup'")
     print("Run 'ansible-playbook /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml' to proceed "
           "with the install")
