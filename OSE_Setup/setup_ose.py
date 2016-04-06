@@ -141,7 +141,7 @@ def validate_int(question_to_ask):
         except ValueError:
             print("That is not a valid number")
             answer = raw_input(question_to_ask)
-
+    return answer
 
 def subscription_manager_setup():
     register_command = ["subscription-manager", "register", "--username=%s" % subscription_username, "--password=%s"
@@ -232,7 +232,7 @@ if "yes" in subscribe_hosts:
 
 
 number_of_masters = validate_int("\nHow many masters is your environment going to have? ")
-logfile_writer.write(number_of_masters)
+logfile_writer.write(str(number_of_masters))
 
 etcd_on_master = validate_yes_no_answer("\nAre the etcd services going to reside on the master nodes (yes/no)? ")
 logfile_writer.write(etcd_on_master)
@@ -252,7 +252,8 @@ use_load_balancer_node = validate_yes_no_answer("\nAre you going to have a separ
 logfile_writer.write(use_load_balancer_node)
 
 if "yes" in use_load_balancer_node:
-    number_of_load_balancer_nodes = validate_int("\nPlease enter the number of load balancer nodes in the OSE environment: ")
+    number_of_load_balancer_nodes = validate_int("\nPlease enter the number of load balancer nodes in "
+                                                 "the OSE environment: ")
     logfile_writer.write(number_of_load_balancer_nodes)
     add_to_list(load_balancer_node_lst, number_of_load_balancer_nodes, "load balancer node ")
 
@@ -261,15 +262,16 @@ use_infrastructure_nodes = validate_yes_no_answer("\nAre you going to have separ
 logfile_writer.write(use_infrastructure_nodes)
 
 if "yes" in use_infrastructure_nodes:
-    number_of_infrastructure_nodes = validate_int("\nPlease enter the number of infrastructure nodes the OSE environment: ")
-    logfile_writer.write(number_of_infrastructure_nodes)
+    number_of_infrastructure_nodes = validate_int("\nPlease enter the number of infrastructure nodes "
+                                                  "the OSE environment: ")
+    logfile_writer.write(str(number_of_infrastructure_nodes))
     add_to_dictionary(infrastructure_node_dict, number_of_infrastructure_nodes, "infrastructure node ")
 
 
 #### setup the application nodes
 
 number_of_application_nodes = validate_int("\nHow many application nodes will you have? ")
-logfile_writer.write(number_of_application_nodes)
+logfile_writer.write(str(number_of_application_nodes))
 add_to_dictionary(application_node_dict, number_of_application_nodes, "application node ")
 
 print("\nIt is recommended that you specify a subdomain for your application wild card dns")
@@ -381,7 +383,9 @@ ansible_file_ose_children += "\n"
 use_htpasswd = validate_yes_no_answer("\nDo you want to use htpasswd for authentication (yes/no?) ")
 
 if "yes" in use_htpasswd:
-    ansible_file_ose_vars += "\nopenshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/htpasswd'}]"
+    ansible_file_ose_vars += "\nopenshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', " \
+                             "'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', " \
+                             "'filename': '/etc/origin/htpasswd'}]"
 
 ansible_file_ose_vars += "\nopenshift_master_cluster_hostname=%s" % master_cluster_hostname
 ansible_file_ose_vars += "\nopenshift_master_cluster_public_hostname=%s" % public_administration_url
@@ -450,8 +454,8 @@ else:
         print("\nAll hosts PASSED reverse zone lookups")
 
 if "yes" in subscribe_hosts:
-    print("\nThe hosts you indicated previously will now be subscribed to the RHN network with the credentials provided "
-          "earlier.")
+    print("\nThe hosts you indicated previously will now be subscribed to the RHN network with the credentials "
+          "provided earlier.")
     run_anisble_adhoc_on_all_hosts(register_command)
     run_anisble_adhoc_on_all_hosts(attach_command)
     run_anisble_adhoc_on_all_hosts(disable_repo)
