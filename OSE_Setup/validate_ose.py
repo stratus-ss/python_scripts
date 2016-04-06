@@ -13,11 +13,12 @@ from helper_functions import DictionaryHandling
 from helper_functions import ImportHelper
 from helper_functions import textColors
 from ssh_connection_handling import HandleSSHConnections
-
-ImportHelper.import_error_handling("paramiko", globals())
 import yum
 import sys
 from optparse import OptionParser
+
+ImportHelper.import_error_handling("paramiko", globals())
+
 
 ansible_ssh_user = "root"
 docker_files_have_been_modified_dict = {}
@@ -40,6 +41,11 @@ selinux_dict = {}
 ose_repos = ["rhel-7-server-rpms", "rhel-7-server-extras-rpms", "rhel-7-server-ose-3.1-rpms"]
 ose_required_packages_list = ["wget", "git", "net-tools", "bind-utils", "iptables-services", "bridge-utils",
                               "bash-completion", "atomic-openshift-utils", "docker"]
+
+# OptionParser's first argument is what is passed in on the command line.
+# the second argument 'dest=' is the variable which holds the value. options.show_sha_sums holds the value for
+# --show-sha-sums.
+# The final arugment is the text that is printed out when the OptionParser help function is called
 parser = OptionParser()
 parser.add_option('--ansible-host-file', dest='ansible_host_file', help='Specify location of ansible hostfile')
 parser.add_option('--show-sha-sums', dest='show_sha_sums', help='Toggle whether or not to show the sha sum of files'
@@ -63,8 +69,8 @@ def is_selinux_enabled(host, ssh_obj, dict_to_modify):
 
 def process_host_file(ansible_host_file):
     # This section should parse the ansible host file for hosts
-    # Need a better way to parse the config file
-    # I am parsing the host file with a similar format to ini files
+    # This parses the host file with a similar format to ini files
+    # TODO: Need a better way to parse the config file
     hosts_list = []
     for line in open(ansible_host_file).readlines():
         # Skip section headings
@@ -93,7 +99,7 @@ def process_host_file(ansible_host_file):
 def test_ssh_keys(host, user):
     """
     test_ssh_keys simply attempts to open an ssh connection to the host
-    returns True if the connection throws a Paramiko exception
+    returns True if the connection is accepted and False if Paramiko throws an exception
     """
     try:
         ssh_connection.open_ssh(host, user)
@@ -159,8 +165,10 @@ def check_docker_files(host, ssh_obj, files_modified_dict, dict_to_compare, remo
                     modified = True
                     DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
                                                          shortened_file_name, modified)
-                DictionaryHandling.add_to_dictionary(remote_docker_file_sums_dict, host, "%s sum : %s" % (shortened_file_name,
-                                                                                                    sha_sum), modified)
+                # Added the file name and sha sum in the key to be able to associate the sum to modified flag
+                # This will help to identify it for colourization
+                DictionaryHandling.add_to_dictionary(remote_docker_file_sums_dict, host, "%s sha256sum : %s" %
+                                                     (shortened_file_name, sha_sum), modified)
         except socket.error:
             print("No SSH connection is open")
 
@@ -208,7 +216,6 @@ def is_host_subscribed(server_name, dict_to_modify, subscript_status):
     It parses the output for the word 'Current' if found, returns true, otherwise returns false
 
     """
-
     for line in subscript_status:
         if "Overall" in line:
             if "Current" in line:
@@ -219,7 +226,7 @@ def is_host_subscribed(server_name, dict_to_modify, subscript_status):
 
 def which_repos_are_enabled(server_name, dict_to_modify, repo_info, these_should_be_enabled):
     """
-    which_repos_are_enabled parses the output from 'subscription-manager repos' command
+    which_repos_are_enabled parses the output from 'subscription-manager repos' command.
     After parsing, it stores enabled repos in a dictionary with the hostname as the key.
     This function does not return anything
     """
@@ -243,7 +250,6 @@ def package_query(server_name, dict_to_modify, package_list):
     Does not return anything, instead uses DictionaryHandling.add_to_dictionary to populate dictionaries
     for processing later in the summation
     """
-
     yb = yum.YumBase()
     inst = yb.rpmdb.returnPackages()
     installed_on_system = [x.name for x in inst]

@@ -36,7 +36,7 @@ class ImportHelper:
 
 class DictionaryHandling:
 
-    """ This class handles the adding to, and output formatting of dictionaries
+    """ This class handles the adding to and output formatting of dictionaries
     """
 
     @staticmethod
@@ -50,6 +50,7 @@ class DictionaryHandling:
     def format_dictionary_output(*args):
         temporary_dict = {}
         temp_list = []
+
         # This populates a temporary dictionary with the contents of all the dictionaries that have been passed in
         # as arguments
         for count, incoming_dictionary in enumerate(args):
@@ -57,11 +58,12 @@ class DictionaryHandling:
                 for component_key in incoming_dictionary[server_name]:
                     DictionaryHandling.add_to_dictionary(temporary_dict, server_name, component_key,
                                                          incoming_dictionary[server_name][component_key])
+
         # This section prints the server name as a heading in the output
         for server_name in temporary_dict.keys():
             print("\n\t" + textColors.OKBLUE + server_name + textColors.ENDC)
             for incoming_dictionary in temporary_dict[server_name]:
-                # I am turning the dictionaries into a list so that I can sort the output
+                # Turn the dictionaries into a list so that I can sort the output
                 temp_var = server_name + " " + incoming_dictionary + " : " + \
                            str(temporary_dict[server_name][incoming_dictionary])
                 temp_list.append(temp_var)
