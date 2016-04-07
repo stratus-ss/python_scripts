@@ -33,6 +33,7 @@ original_docker_file_hashes = \
 forward_lookup_dict = {}
 reverse_lookup_dict = {}
 repo_dict = {}
+package_updates_available_dict = {}
 subscription_dict = {}
 ose_package_installed_dict = {}
 ose_package_not_installed_dict = {}
@@ -244,13 +245,14 @@ def which_repos_are_enabled(server_name, dict_to_modify, repo_info, these_should
                 DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, repo_name, enabled)
 
 
-def package_query(server_name, dict_to_modify, package_list):
+def package_query(server_name, repo_dict_to_modify, package_update_dict, package_list):
     """
     package_query uses the yum module to determine if packages exist on the remote system
     Does not return anything, instead uses DictionaryHandling.add_to_dictionary to populate dictionaries
     for processing later in the summation
     """
     yb = yum.YumBase()
+    packages_to_be_updated = yb.update()
     inst = yb.rpmdb.returnPackages()
     installed_on_system = [x.name for x in inst]
     ose_required_packages_installed = []
@@ -261,10 +263,17 @@ def package_query(server_name, dict_to_modify, package_list):
         else:
             ose_required_packages_not_installed.append(package)
     if len(package_list) != len(ose_required_packages_installed):
-        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Missing",
-                                         ose_required_packages_not_installed)
+        DictionaryHandling.add_to_dictionary(repo_dict_to_modify, server_name, "Missing",
+                                             ose_required_packages_not_installed)
     else:
-        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "All Packages Installed", True)
+        DictionaryHandling.add_to_dictionary(repo_dict_to_modify, server_name, "All Packages Installed", True)
+    if packages_to_be_updated:
+        for package in packages_to_be_updated:
+            package = str(package)
+            if package.split(".")[0] in package_list:
+                DictionaryHandling.add_to_dictionary(package_update_dict, server_name, "Available for update",
+                                                 package.split()[0])
+
 
 if __name__ == "__main__":
     if options.ansible_host_file is None:
@@ -299,7 +308,7 @@ if __name__ == "__main__":
             is_host_subscribed(server, subscription_dict, sub_status)
             repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
             which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
-            package_query(server, repo_dict, ose_required_packages_list)
+            package_query(server, repo_dict, package_updates_available_dict, ose_required_packages_list)
             ssh_connection.close_ssh()
         check_forward_dns_lookup(server, forward_lookup_dict)
         check_reverse_dns_lookup(forward_lookup_dict, reverse_lookup_dict)
@@ -320,4 +329,4 @@ if __name__ == "__main__":
 
     print(textColors.HEADER + textColors.BOLD + "\n\nPackages and repo information" + textColors.ENDC)
     DictionaryHandling.format_dictionary_output(repo_dict, subscription_dict, ose_package_not_installed_dict,
-                                                ose_package_installed_dict)
+                                                ose_package_installed_dict, package_updates_available_dict)
