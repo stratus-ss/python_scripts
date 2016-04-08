@@ -267,7 +267,7 @@ def installed_package_query(server_name, repo_dict_to_modify, package_list, ssh_
         DictionaryHandling.add_to_dictionary(repo_dict_to_modify, server_name, "Missing",
                                              ose_required_packages_not_installed)
     else:
-        DictionaryHandling.add_to_dictionary(repo_dict_to_modify, server_name, "All Packages Installed", True)
+        DictionaryHandling.add_to_dictionary(repo_dict_to_modify, server_name, "All OSE Packages Installed", True)
 
 
 def update_required_query(server_name, package_update_dict, package_list, ssh_obj):
@@ -279,7 +279,6 @@ def update_required_query(server_name, package_update_dict, package_list, ssh_ob
     packages_to_be_updated = HandleSSHConnections.run_remote_commands(ssh_obj, "yum list updates")
     ose_package_needs_update = False
     system_up_to_date = True
-    print(len(packages_to_be_updated))
     if len(packages_to_be_updated) > 2:
         system_up_to_date = False
         for package in packages_to_be_updated:
@@ -291,7 +290,6 @@ def update_required_query(server_name, package_update_dict, package_list, ssh_ob
     if not ose_package_needs_update:
          DictionaryHandling.add_to_dictionary(package_update_dict, server_name, "System is up to date",
                                               system_up_to_date)
-    print(ose_package_needs_update)
 
 if __name__ == "__main__":
     if options.ansible_host_file is None:
@@ -321,13 +319,13 @@ if __name__ == "__main__":
             installed_package_query(server, repo_dict, ose_required_packages_list, ssh_connection)
             update_required_query(server, package_updates_available_dict, ose_required_packages_list, ssh_connection)
             is_selinux_enabled(server, ssh_connection, selinux_dict)
-            #systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
-            #is_docker_enabled(server, systemctl_output, docker_service_check_dict)
-            #is_docker_running(server, systemctl_output, docker_service_check_dict)
-            #sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
-            #is_host_subscribed(server, subscription_dict, sub_status)
-            #repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
-            #which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
+            systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
+            is_docker_enabled(server, systemctl_output, docker_service_check_dict)
+            is_docker_running(server, systemctl_output, docker_service_check_dict)
+            sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
+            is_host_subscribed(server, subscription_dict, sub_status)
+            repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
+            which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
             ssh_connection.close_ssh()
         check_forward_dns_lookup(server, forward_lookup_dict)
         check_reverse_dns_lookup(forward_lookup_dict, reverse_lookup_dict)
