@@ -22,7 +22,7 @@ parser = OptionParser()
 parser.add_option('--source-project-name', '-p', dest = 'source_project_name',
                   help = 'Specify the project the application template is in')
 parser.add_option('--app-name', '-a', dest = 'app_name', help = 'Specify an application to make a template from')
-parser.add_option('--url', '-u', dest = 'url', help = 'Specify a URL to inject into the template')
+parser.add_option('--url', '-u', dest = 'url', help = '(Optional) Specify a URL to inject into the template')
 (options, args) = parser.parse_args()
 
 if not options.source_project_name or not options.app_name:
