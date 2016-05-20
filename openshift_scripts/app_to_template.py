@@ -11,7 +11,7 @@
 # location of the template created. The idea for this is so that it can be used in conjunction with
 # a process that will recreate the application from the template in a new project
 # Ex: oc process -f `./app_to_template.py --source-project-name myproject --app-name cakephp-example \
-# --url mynewapp.my-subdomain.example.com
+# --url mynewapp.my-subdomain.example.com | oc create -f -
 
 import os
 import sys
