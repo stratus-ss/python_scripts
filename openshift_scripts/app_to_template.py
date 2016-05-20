@@ -31,7 +31,8 @@ if not options.source_project_name or not options.app_name:
 
 # Store the sys.stdout so that it is easy to restore later
 old_stdout = sys.stdout
-
+# We want to store the current project so we can return to it after we create the template
+current_project = os.popen("oc project").read().split()[2]
 template_name = options.app_name + "_template"
 template_output_path = "/tmp/"
 template_output = template_output_path + template_name + ".yaml"
@@ -83,3 +84,6 @@ if app_in_project:
 else:
     print("%s was not found in project %s" % (options.app_name, options.source_project_name))
     sys.exit(2)
+
+# return to the project where the template was created
+os.popen("oc project %s" % current_project).read()
