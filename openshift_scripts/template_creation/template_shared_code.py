@@ -25,6 +25,8 @@ class TemplateParsing:
                                                                               ' put in the template. ENV_NAME=\"value\"'
                                                                               ' NOTE: escaping quotes is required',
                       action = 'append')
+    parser.add_option('--app-name', '-a', dest = 'app_name', help = 'Specify an application to make a template from')
+
     (options, args) = parser.parse_args()
 
     # Inspecting the options to make sure something has been passed, if not show the help
@@ -45,7 +47,6 @@ class TemplateParsing:
     @staticmethod
     def substitute_values_in_template(export_command, template_output, substitute_this_url, environment_variables,
                                       source_project, destination_project):
-        print(destination_project)
         # Store the sys.stdout so that it is easy to restore later
         old_stdout = sys.stdout
 
