@@ -63,5 +63,8 @@ if TemplateParsing.options.url or TemplateParsing.options.env_variable:
                                                   TemplateParsing.options.destination_project_name)
 else:
     TemplateParsing.export_as_template(export_command, template_output)
-
-TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output)
+if TemplateParsing.options.credentials_file:
+    TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output,
+                                   TemplateParsing.options.credentials_file)
+else:
+    TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output)
