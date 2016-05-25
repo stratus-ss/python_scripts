@@ -10,6 +10,8 @@ from optparse import OptionParser
 import sys
 import datetime
 import os
+import __main__ as main
+
 
 class TemplateParsing:
 
@@ -21,12 +23,16 @@ class TemplateParsing:
     parser.add_option('--url', '-u', dest = 'url', help = '(Optional) Specify a URL to inject into the template.'
                                                           ' If the keyworld "replace" is used, the current route '
                                                           'is replaced with a similar url by swapping the project name')
-    parser.add_option('--env-variables', '-e', dest = 'env_variables', help = '(Optional) environment variables to'
-                                                                              ' put in the template. ENV_NAME=\"value\"'
-                                                                              ' NOTE: escaping quotes is required',
-                      action = 'append')
+    parser.add_option("--credentials-file", '-c', dest = 'credentials_file',
+                      help = '(Optional) Specify a credentials file to use for the creation of secrets in the'
+                             ' destination project. Current options are docker=<path to .dockercfg> or git=<path to '
+                             'credentials file>', action = 'append')
+    # Only show these options if transfering a single application. This is not applicable to project creation
+    #if "app" in main.__file__:
     parser.add_option('--app-name', '-a', dest = 'app_name', help = 'Specify an application to make a template from')
-
+    parser.add_option('--env-variables', '-e', dest = 'env_variables',
+                          help = '(Optional) environment variables to put in the template. ENV_NAME=\"value\"'
+                                 ' NOTE: escaping quotes is required', action = 'append')
     (options, args) = parser.parse_args()
 
     # Inspecting the options to make sure something has been passed, if not show the help
@@ -118,11 +124,48 @@ class TemplateParsing:
         os.popen("%s > %s" % (export_command, template_full_path)).read()
 
     @staticmethod
-    def create_objects(destination_project, template_full_path):
+    def create_objects(destination_project, template_full_path, *args):
         change_to_project = os.popen("oc project %s 2> /dev/null" % destination_project).read()
+        git_secret_name = "gitauth"
+        docker_secret_name = "dockerconfig"
         if not change_to_project:
             os.popen("oc new-project %s" % destination_project)
+        for credentials_file in args[0]:
+            path_to_file = credentials_file.split("=")[1]
+            if "git" in credentials_file:
+                username, password = TemplateParsing.parse_credentials_file(path_to_file)
+                print("Adding git secret: %s" % git_secret_name)
+                os.popen("oc secrets new-basicauth %s --username=%s --password=%s -n %s"
+                           % (git_secret_name, username, password, destination_project)).read()
+                print("Adding to serviceaccount/default\n")
+                os.popen("oc secrets add serviceaccount/default secrets/%s" % git_secret_name).read()
+            if "docker" in credentials_file:
+                print("Adding .dockerconfig secret: %s" % docker_secret_name)
+                os.popen("oc secrets new %s .dockercfg=%s" % (docker_secret_name, path_to_file)).read()
+                print("Adding to serviceaccount/default and serviceaccount/builder\n")
+                os.popen("oc secrets add serviceaccount/default secrets/%s --for=pull" % docker_secret_name).read()
+                os.popen("oc secrets add serviceaccount/builder secrets/%s --for=pull" % docker_secret_name).read()
         print(os.popen("oc process -f %s | oc create -f -" % template_full_path)).read()
+
+    @staticmethod
+    def parse_credentials_file(path_to_file):
+        username_split_keyword = "USERNAME"
+        password_split_keyword = "PASSWORD"
+        for line in open(path_to_file).readlines():
+            if line.strip():
+                if not line.startswith("#"):
+                    if line.upper().startswith(username_split_keyword):
+                        if line.upper().split(username_split_keyword)[1].startswith("="):
+                            username = line.split("=")[1].strip()
+                        if line.upper().split(username_split_keyword)[1].startswith(":"):
+                            username = line.split(":")[1].strip()
+                    if line.upper().startswith(password_split_keyword):
+                        if line.upper().split(password_split_keyword)[1].startswith("="):
+                            password = line.split("=")[1].strip()
+                        if line.upper().split(password_split_keyword)[1].startswith(":"):
+                            password = line.split(":")[1].strip()
+        return(username, password)
+
 
 
 class PermissionParsing:
