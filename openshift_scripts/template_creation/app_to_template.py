@@ -32,7 +32,7 @@ old_stdout = sys.stdout
 # We want to store the current project so we can return to it after we create the template
 # In case the project has been deleted or is missing, switch to the default project
 try:
-    destination_project = os.popen("oc project").read().split()[2]
+    destination_project = os.popen("oc project 2>/dev/null").read().split()[2]
 except IndexError:
     os.popen("oc project default").read()
 
@@ -42,6 +42,7 @@ template_output = template_output_path + template_name + ".yaml"
 ose_resources_to_export = ['imagestream', 'deploymentconfig', 'buildconfig', 'service', 'route']
 resource_with_apps = []
 script_run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M")
+resource_dictionary = {}
 
 for resource in ose_resources_to_export:
     resource_with_apps.append("%s/%s" % (resource, TemplateParsing.options.app_name))
@@ -55,7 +56,8 @@ if os.path.exists(template_output):
 
 # Change to the correct project before attempting to export the resources
 os.popen("/usr/bin/oc project %s" % TemplateParsing.options.source_project_name).read()
-print("Checking for valid configuration files for %s in %s" % (TemplateParsing.options.app_name, TemplateParsing.options.source_project_name))
+print("Checking for valid configuration files for %s in %s" % (TemplateParsing.options.app_name,
+                                                               TemplateParsing.options.source_project_name))
 
 # Check to make sure the application exists in the project
 # Assume that the deployment config is going to have the same name as the app
@@ -69,11 +71,14 @@ if app_in_project:
     export_command = "/usr/bin/oc export %s --as-template=%s" % (" ".join(resource_with_apps), template_name)
     # If the optional url flag was passed into the script, search the text for a route spec
     # At the time of writing this is denoted by "host: <url>" in the spec section of a route
-    if TemplateParsing.options.url or TemplateParsing.options.env_variable:
-        TemplateParsing.substitute_values_in_template(export_command, template_output, TemplateParsing.options.url,
-                                                      TemplateParsing.options.env_variables,
-                                                      TemplateParsing.options.source_project_name,
-                                                      TemplateParsing.options.destination_project_name)
+    if TemplateParsing.options.url is not None or TemplateParsing.options.env_variables is not None:
+        resource_dictionary['source_project'] = TemplateParsing.options.source_project_name
+        resource_dictionary['destination_project'] = TemplateParsing.options.destination_project_name
+        if TemplateParsing.options.url is not None:
+            resource_dictionary["url"] = TemplateParsing.options.url
+        if TemplateParsing.options.env_variables is not None:
+            resource_dictionary["environment_vars"] = TemplateParsing.options.env_variable
+        TemplateParsing.substitute_values_in_template(export_command, template_output, resource_dictionary)
     else:
         TemplateParsing.export_as_template(export_command, template_output)
 else:

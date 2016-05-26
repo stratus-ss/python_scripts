@@ -18,6 +18,7 @@
 import datetime
 import os
 from template_shared_code import TemplateParsing
+import sys
 
 ###### Variable declaration
 
@@ -27,7 +28,7 @@ template_output = template_output_path + template_name + ".yaml"
 ose_resources_to_export = ['imagestream', 'deploymentconfig', 'buildconfig', 'service', 'route']
 resources_to_import = []
 script_run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M")
-
+resource_dictionary = {}
 ###### End variable declaration
 
 # Change to the correct project before attempting to export the resources
@@ -54,15 +55,15 @@ if os.path.exists(template_output):
 
 export_command = "/usr/bin/oc export %s --as-template=%s" % (" ".join(resources_to_import), template_name)
 
-if TemplateParsing.options.url or TemplateParsing.options.env_variable:
-    # If the optional url flag was passed into the script, search the text for a route spec
-    # At the time of writing this is denoted by "host: <url>" in the spec section of a route
-    TemplateParsing.substitute_values_in_template(export_command, template_output, TemplateParsing.options.url,
-                                                  TemplateParsing.options.env_variables,
-                                                  TemplateParsing.options.source_project_name,
-                                                  TemplateParsing.options.destination_project_name)
+if TemplateParsing.options.url is not None:
+    resource_dictionary['source_project'] = TemplateParsing.options.source_project_name
+    resource_dictionary['destination_project'] = TemplateParsing.options.destination_project_name
+    resource_dictionary["url"] = TemplateParsing.options.url
+    TemplateParsing.substitute_values_in_template(export_command, template_output, resource_dictionary)
 else:
-    TemplateParsing.export_as_template(export_command, template_output)
+    print("No URL options are specified, this means that you would have projects sharing the same route.\n"
+          "This is probably a bad idea. Exiting...")
+    sys.exit()
 if TemplateParsing.options.credentials_file:
     TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output,
                                    TemplateParsing.options.credentials_file)
