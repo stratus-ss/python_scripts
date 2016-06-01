@@ -41,7 +41,7 @@ class TemplateParsing:
         parser.add_option('--env-variables', '-e', dest = 'env_variables',
                       help = '(Optional) environment variables to put in the template. ENV_NAME=\"value\"'
                              ' NOTE: escaping quotes is required', action = 'append')
-    if "configmap" in main.__file__:
+    if "import" in main.__file__:
         parser.add_option('--configmap-file', dest = 'config_map_file',
                       help = 'Specify the configmap file to import from')
     if "export" in main.__file__:
@@ -83,7 +83,7 @@ class TemplateParsing:
                     yaml_value = current_line.split(":")[0].strip()
                     if yaml_value in remove_these_lines:
                         skip_line = True
-            if "urls" in resource_dict.keys():
+            if "url" in resource_dict.keys():
                 if "host: " in current_line:
                     try:
                         # If we find a route section, tell the global print statement not to handle this line
