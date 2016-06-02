@@ -24,7 +24,6 @@ class textColors:
     HIGHLIGHT = '\033[96m'
 
 
-
 class TemplateParsing:
 
     # main.__file__ reads the name of the calling script. Examining this will help determine which help options to show
@@ -286,7 +285,6 @@ class TemplateParsing:
         return(username, password)
 
 
-
 class PermissionParsing:
 
     @staticmethod
@@ -302,8 +300,18 @@ class PermissionParsing:
             if "none" in line:
                 pass
             else:
-                dict_object = " ".join(line.split()[1:]).replace(",", "")
-                PermissionParsing.add_to_dictionary(incoming_dict, incoming_role, object_name, dict_object)
+                role_list = []
+                for entry in line.split()[1:]:
+                    # We don't want to add system:servicesaccounts to new projects so exclude them
+                    if "system:serviceaccounts" in entry:
+                        pass
+                    else:
+                        role_list.append(entry)
+                # role_list will be empty if there is a group which only had an entry for system:serviceaccounts
+                # check to see if the list is populated, if it is add the permissions
+                if role_list:
+                    dict_object = " ".join(role_list).replace(",", "")
+                    PermissionParsing.add_to_dictionary(incoming_dict, incoming_role, object_name, dict_object)
 
         my_dict = {}
         policy_bindings = os.popen("oc describe policybinding -n %s" % project_name).read().split("\n")
