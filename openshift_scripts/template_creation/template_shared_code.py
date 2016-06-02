@@ -2,7 +2,7 @@
 
 # Owner: Steve Ovens <steve D0T ovens <AT> redhat -DOT- com>
 # Date Created: May 2016
-# Modified: May 20, 2016
+# Modified: June 1, 2016
 # Primary Function:
 # This is just a library for common code base for template related activities
 
@@ -24,11 +24,19 @@ class TemplateParsing:
     if not "import" in main.__file__:
         parser.add_option('--source-project-name', '-s', dest = 'source_project_name',
                           help = 'Specify the project the resource which you wish to template is in')
-    if not "configmap" in main.__file__:
+    if not "configmap" in main.__file__ and not "rolebinding" in main.__file__:
         parser.add_option('--url', '-u', dest = 'url', help = '(Optional) Specify a URL to inject into the template.'
                                                           ' If the keyworld "replace" is used, the current route '
                                                           'is replaced with a similar url by swapping the project name')
-
+        parser.add_option('-r', '--registry', dest = 'ose_registry', help = 'Specify a registry which holds an existing '
+                                                                       ' image you want to transfer between projects.')
+        parser.add_option('-b', '--initiate-build', dest = 'copy_build_config', help = 'Set to no if you want to'
+                                                                                       ' promote an existing image'
+                                                                                       ' without rebuilding it.')
+        parser.add_option('-t', '--ose-token', dest = "ose_token", help = 'Provide a token (oc whoami -t) to'
+                                                                                ' enable docker login')
+        parser.add_option('--username', dest = "docker_username", help = 'Provide a username to login to the OSE'
+                                                                         ' registry with')
         if not "app" in main.__file__:
             parser.add_option("--credentials-file", '-c', dest = 'credentials_file',
                       help = '(Optional) Specify a credentials file to use for the creation of secrets in the'
@@ -60,6 +68,21 @@ class TemplateParsing:
         sys.exit(2)
 
     @staticmethod
+    def docker_promote_image(registry_address, docker_username, ose_token, source_project, destination_project,
+                             image_name):
+        login_command = 'docker login -u %s -p %s %s' % (docker_username, ose_token, registry_address)
+        print(os.popen(login_command).read())
+        source_image_name =  '%s/%s/%s' % (registry_address, source_project, image_name)
+        pull_command = 'docker pull %s/%s/%s' % (registry_address, source_project, image_name)
+        print(os.popen(pull_command).read())
+        docker_image_id = os.popen("docker images |grep %s" % source_image_name).read().split()[2]
+        destination_image_name = '%s/%s/%s' % (registry_address, destination_project, image_name)
+        tag_command = 'docker tag %s %s' % (docker_image_id, destination_image_name)
+        push_command = 'docker push %s' % destination_image_name
+        print(os.popen(tag_command).read())
+        print(os.popen(push_command).read())
+
+    @staticmethod
     def replace_value(line_to_replace, replace_with_this):
         split_on_this = ": "
         value_to_replace = [word + split_on_this for word in line_to_replace.split(split_on_this)]
@@ -83,6 +106,12 @@ class TemplateParsing:
                     yaml_value = current_line.split(":")[0].strip()
                     if yaml_value in remove_these_lines:
                         skip_line = True
+            if "image_deployment" in resource_dict.keys():
+                if resource_dict["image_deployment"] in current_line:
+                    skip_line = True
+                    replace_docker_image_location = current_line.split(": ")[1].replace(resource_dict['source_project'],
+                                                                              resource_dict['destination_project'])
+                    TemplateParsing.replace_value(current_line, replace_docker_image_location)
             if "url" in resource_dict.keys():
                 if "host: " in current_line:
                     try:
@@ -103,7 +132,7 @@ class TemplateParsing:
             # passed and store the results in a dictionary for easier lookup
             if "environment_vars" in resource_dict.keys():
                 environment_variable_dict = {}
-                for value in resource_dict['environment_vars'].split():
+                for value in resource_dict['environment_vars']:
                     try:
                         components = value.split("=")
                         environment_variable_dict[components[0]] = components[1]
@@ -120,9 +149,17 @@ class TemplateParsing:
                             env_variable_name = previous_line.split("name: ")[1]
                         if env_variable_name in environment_variable_dict:
                             if env_variable_name in previous_line:
+                                line_to_replace = current_line
                                 skip_line = True
-                                TemplateParsing.replace_value(current_line,
+                                if "value:" not in current_line:
+                                    # If there is currently no value for the env, inject it,
+                                    # keeping track of current line. Will need to print the current line as well as
+                                    # The value line.
+                                    skip_line = False
+                                    line_to_replace = "            value: replaceme"
+                                TemplateParsing.replace_value(line_to_replace,
                                                               environment_variable_dict[env_variable_name])
+                                #print(next_line)
                         if "status:" in current_line:
                             deployment_config_section = False
                 except NameError:

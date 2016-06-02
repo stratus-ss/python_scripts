@@ -2,7 +2,7 @@
 
 # Owner: Steve Ovens <steve D0T ovens <AT> redhat -DOT- com>
 # Date Created: May 2016
-# Modified: May 20, 2016
+# Modified: June 1, 2016
 # Primary Function:
 # This script will interact with OpenShift Enterprise (tested on v 3.1) in order to create a template
 # from an existing project.
@@ -29,6 +29,7 @@ ose_resources_to_export = ['imagestream', 'deploymentconfig', 'buildconfig', 'se
 resources_to_import = []
 script_run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M")
 resource_dictionary = {}
+promote_image = False
 ###### End variable declaration
 
 # Change to the correct project before attempting to export the resources
@@ -43,6 +44,13 @@ for current_line in os.popen("/usr/bin/oc get dc").read().split("\n"):
             valid_apps.append(current_line.split()[0])
         except IndexError:
             pass
+
+if TemplateParsing.options.ose_registry is not None and TemplateParsing.options.copy_build_config.lower() == "no" \
+   and TemplateParsing.options.ose_token is not None and TemplateParsing.options.docker_username is not None:
+    ose_resources_to_export = ['imagestream', 'deploymentconfig', 'service', 'route']
+    resource_dictionary['image_deployment'] = TemplateParsing.options.ose_registry
+    promote_image = True
+
 
 for resource in ose_resources_to_export:
     for apps in valid_apps:
@@ -64,8 +72,16 @@ else:
     print("No URL options are specified, this means that you would have projects sharing the same route.\n"
           "This is probably a bad idea. Exiting...")
     sys.exit()
+
 if TemplateParsing.options.credentials_file:
     TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output,
                                    TemplateParsing.options.credentials_file)
 else:
     TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output)
+
+if promote_image:
+    for application in valid_apps:
+        TemplateParsing.docker_promote_image(TemplateParsing.options.ose_registry, TemplateParsing.options.docker_username,
+                                        TemplateParsing.options.ose_token, TemplateParsing.options.source_project_name,
+                                        TemplateParsing.options.destination_project_name,
+                                        application)
