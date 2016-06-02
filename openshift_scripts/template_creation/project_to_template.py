@@ -45,6 +45,8 @@ for current_line in os.popen("/usr/bin/oc get dc").read().split("\n"):
         except IndexError:
             pass
 
+# All 4 docker options are required to proceed with docker pull/push.
+# If all 4 are present, omit the build config because an image 'promotion' is occurring
 if TemplateParsing.options.ose_registry is not None and TemplateParsing.options.copy_build_config.lower() == "no" \
    and TemplateParsing.options.ose_token is not None and TemplateParsing.options.docker_username is not None:
     ose_resources_to_export = ['imagestream', 'deploymentconfig', 'service', 'route']
@@ -80,6 +82,7 @@ else:
     TemplateParsing.create_objects(TemplateParsing.options.destination_project_name, template_output)
 
 if promote_image:
+    # Because a project could have multiple applications, loop over each and then start docker pull/push
     for application in valid_apps:
         TemplateParsing.docker_promote_image(TemplateParsing.options.ose_registry, TemplateParsing.options.docker_username,
                                         TemplateParsing.options.ose_token, TemplateParsing.options.source_project_name,

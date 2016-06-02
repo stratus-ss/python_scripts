@@ -65,6 +65,8 @@ for current_line in os.popen("/usr/bin/oc get dc").read().split("\n"):
         print("Valid configurations found...")
 
 if app_in_project:
+    # All 4 docker options are required to proceed with docker pull/push.
+    # If all 4 are present, omit the build config because an image 'promotion' is occurring
     if TemplateParsing.options.ose_registry is not None and TemplateParsing.options.copy_build_config.lower() == "no" \
        and TemplateParsing.options.ose_token is not None and TemplateParsing.options.docker_username is not None:
         ose_resources_to_export = ['imagestream', 'deploymentconfig', 'service', 'route']

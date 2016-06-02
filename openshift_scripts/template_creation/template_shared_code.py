@@ -12,19 +12,42 @@ import datetime
 import os
 import __main__ as main
 
+class textColors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    HIGHLIGHT = '\033[96m'
+
+
 
 class TemplateParsing:
 
     # main.__file__ reads the name of the calling script. Examining this will help determine which help options to show
 
     parser = OptionParser()
+    # the config export, or any future export scripts will not require a destination project so hide this option
     if not "export" in main.__file__:
         parser.add_option('--destination-project-name', '-d', dest = 'destination_project_name',
                       help = 'Specify the project to apply template to')
+
+    # Assuming imports are happening from a file, no source project is required so hide this option
     if not "import" in main.__file__:
         parser.add_option('--source-project-name', '-s', dest = 'source_project_name',
                           help = 'Specify the project the resource which you wish to template is in')
+
+    # These options are only applicable to project_to_template and app_to_template
     if not "configmap" in main.__file__ and not "rolebinding" in main.__file__:
+        if not "app" in main.__file__:
+            parser.add_option("--credentials-file", '-c', dest = 'credentials_file',
+                              help = '(Optional) Specify a credentials file to use for the creation of secrets in the'
+                                     ' destination project. Current options are docker=<path to .dockercfg> or '
+                                     'git=<path to '
+                                     'credentials file>', action = 'append')
         parser.add_option('--url', '-u', dest = 'url', help = '(Optional) Specify a URL to inject into the template.'
                                                           ' If the keyworld "replace" is used, the current route '
                                                           'is replaced with a similar url by swapping the project name')
@@ -37,13 +60,8 @@ class TemplateParsing:
                                                                                 ' enable docker login')
         parser.add_option('--username', dest = "docker_username", help = 'Provide a username to login to the OSE'
                                                                          ' registry with')
-        if not "app" in main.__file__:
-            parser.add_option("--credentials-file", '-c', dest = 'credentials_file',
-                      help = '(Optional) Specify a credentials file to use for the creation of secrets in the'
-                             ' destination project. Current options are docker=<path to .dockercfg> or git=<path to '
-                             'credentials file>', action = 'append')
 
-    # Only show these options if transfering a single application. These are not applicable to project creation
+    # Only show these options if transferring a single application. These are not applicable to project creation
     if "app" in main.__file__:
         parser.add_option('--app-name', '-a', dest = 'app_name', help = 'Specify an application to make a template from')
         parser.add_option('--env-variables', '-e', dest = 'env_variables',
@@ -60,9 +78,41 @@ class TemplateParsing:
 
     # Inspecting the options to make sure something has been passed, if not show the help
     show_help = True
+
+    # These values are required together. If one is missing the docker section will not work
+    # So make a disclaimer then exit the program if at least one of these options is specified but not all
+    docker_required_options = ["ose_registry", "docker_username", "ose_token", "copy_build_config"]
+
+    how_many_docker_options_were_passed = []
+
     for opt, value in options.__dict__.items():
-        if value is not None:
-            show_help = False
+        if opt in docker_required_options:
+            if value is not None:
+                how_many_docker_options_were_passed.append(opt)
+        # Check to see if all options (excluding docker pull/push options) are missing. If they are show the help
+        else:
+            if value is not None:
+                show_help = False
+
+    # Check to see if the user has passed in docker pull/push options
+    if how_many_docker_options_were_passed:
+        # Currently 4 options are required to work together. If there are less than 4 options passed
+        # show the user which options are missing
+        if len(how_many_docker_options_were_passed) < 4:
+            missing_options = []
+            for docker_options in docker_required_options:
+                if docker_options in how_many_docker_options_were_passed:
+                    pass
+                else:
+                    missing_options.append(docker_options)
+            if len(missing_options) > 1:
+                missing_options = ", ".join(missing_options)
+            print(textColors.FAIL)
+            print("\n\nYou are missing options required for the docker pull/push section you requested: %s\n\n"
+                  % missing_options[0])
+            print(textColors.ENDC)
+            show_help = True
+
     if show_help:
         parser.print_help()
         sys.exit(2)
@@ -70,6 +120,11 @@ class TemplateParsing:
     @staticmethod
     def docker_promote_image(registry_address, docker_username, ose_token, source_project, destination_project,
                              image_name):
+        """ This method is used to copy an image from one section of the OSE docker registry to another.
+         This allows for the 'promotion' of an image between projects without having to rebuild them.
+         Promotion is done through pulling of an image from the source project and pushing it into the
+         docker registry of another project"""
+
         login_command = 'docker login -u %s -p %s %s' % (docker_username, ose_token, registry_address)
         print(os.popen(login_command).read())
         source_image_name =  '%s/%s/%s' % (registry_address, source_project, image_name)
@@ -107,6 +162,9 @@ class TemplateParsing:
                     if yaml_value in remove_these_lines:
                         skip_line = True
             if "image_deployment" in resource_dict.keys():
+                # If we are doing an image deployment/promotion look for the OSE registry in the current line
+                # This will be the location of image in the OSE registry. When found, change the location to the
+                # destination project so the deployment config references the correct image
                 if resource_dict["image_deployment"] in current_line:
                     skip_line = True
                     replace_docker_image_location = current_line.split(": ")[1].replace(resource_dict['source_project'],
@@ -176,6 +234,11 @@ class TemplateParsing:
 
     @staticmethod
     def create_objects(destination_project, template_full_path, *args):
+        """ This method will create a project if it does not exist.
+         In addition, it will add docker and git secrets to the project after created
+         if those secrets are passed in as options. These secrets are then applied to
+         'default' and 'builder' service accounts as required by OSE"""
+
         change_to_project = os.popen("oc project %s 2> /dev/null" % destination_project).read()
         git_secret_name = "gitauth"
         docker_secret_name = "dockerconfig"
@@ -201,6 +264,8 @@ class TemplateParsing:
 
     @staticmethod
     def parse_credentials_file(path_to_file):
+        """ Basic method which looks for 'username' and 'password' keywords on separate lines.
+         Will split on either 'username=' or 'username:'"""
         username_split_keyword = "USERNAME"
         password_split_keyword = "PASSWORD"
         for line in open(path_to_file).readlines():
