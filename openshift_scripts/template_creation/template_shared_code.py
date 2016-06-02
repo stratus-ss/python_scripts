@@ -106,10 +106,12 @@ class TemplateParsing:
                 else:
                     missing_options.append(docker_options)
             if len(missing_options) > 1:
-                missing_options = ", ".join(missing_options)
+                print_missing_options = ", ".join(missing_options)
+            else:
+                print_missing_options = missing_options[0]
             print(textColors.FAIL)
             print("\n\nYou are missing options required for the docker pull/push section you requested: %s\n\n"
-                  % missing_options[0])
+                  % print_missing_options)
             print(textColors.ENDC)
             show_help = True
 
