@@ -1,0 +1,26 @@
+**app_to_template.py:** This script will take an app from an existing project and move it into a target project. If the project does not exist, it will create it. The script can change routes as well as update environment variables if required. The sample usage below will take the application "cakephp-example" from the myoldproj and put it in the myprivateproject while at the same time updating the route (originally the route was cakephp-example-myoldproj.apps.example.com, it will be created as cakephp-example-myprivateproject.apps.example.com)
+
+./app_to_template.py -s myoldproj -d myprivateproject -u replace -a cakephp-example
+
+
+**export_configmap.py:** This script takes in a source project as well as the config map name (since a project can have multiple config maps) and exports them to a yaml file. It automatically generates a name similar to the following: $(source project name)_$(user defined configmap name)_configmap_template.yaml
+
+./export_configmap.py -s project-test --configmap-name my_configmap
+
+ 
+**import_configmap.py:** This script will take a yaml config map file and import it into the destination project
+
+./import_configmap.py -d config-test --configmap-file /tmp/myoldproj_my_configmap_configmap_template.yaml
+
+ 
+**project_to_template.py:** This script takes the source project and creates a template out of it. The template includes all applications, routes, services, build configs, deployment configs and optionally you can pass in basic auth and docker secrets. The sample usage below will clone the myoldproj into "new-project" while replacing the route with the new project name. It is also importing basic auth credentials (username and password) from the "git_credentials" file as well as setting up the --for-pull option with the json contents inside of the docker-config file.
+
+./project_to_template.py -s myoldproj -d new-project -u replace -c git=git_credentials -c docker=docker-config
+
+ 
+**rolebinding_reconciler.py:** This script copies the rolebindings from a source project to a target project
+
+./rolebinding_reconciler.py -s myoldproj -d project-test
+
+ 
+**template_shared_code.py:** This is a required library file which contains shared code. It is expected to be in the same directory as the other scripts. This file does nothing if run on its own except spit out generic help to stdout
