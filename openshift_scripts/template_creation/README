@@ -1,3 +1,8 @@
+
+#####
+# ALL OUTPUT is being generated in /tmp as it is deemed unnecessary to backup these files
+#####
+
 **app_to_template.py:** This script will take an app from an existing project and move it into a target project. If the project does not exist, it will create it. The script can change routes as well as update environment variables if required. The sample usage below will take the application "cakephp-example" from the myoldproj and put it in the myprivateproject while at the same time updating the route (originally the route was cakephp-example-myoldproj.apps.example.com, it will be created as cakephp-example-myprivateproject.apps.example.com)
 
 ./app_to_template.py -s myoldproj -d myprivateproject -u replace -a cakephp-example
