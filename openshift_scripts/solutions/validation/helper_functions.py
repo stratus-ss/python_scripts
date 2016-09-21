@@ -87,7 +87,7 @@ class DictionaryHandling:
                         if "sum" in output:
                             output = " :".join(output.split(":")[:-1])
                         print(textColors.FAIL + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                    elif "available" in output.lower():
+                    elif "available" in output.lower() or "Warning" in output.lower():
                         print(textColors.WARNING + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
                     else:
                         print("\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)

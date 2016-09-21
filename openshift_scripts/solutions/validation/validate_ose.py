@@ -194,7 +194,7 @@ def is_docker_running(server_name, output, dict_to_modify):
         print("Docker is not running: \n")
         for line in output:
             print(textColors.FAIL + line + textColors.ENDC),
-        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Running", False)
+        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Running", "Warning")
 
 
 def is_docker_enabled(server_name, output, dict_to_modify):
@@ -208,7 +208,7 @@ def is_docker_enabled(server_name, output, dict_to_modify):
                 if "enabled" in line.split("vendor preset")[0]:
                     DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Enabled", True)
                 else:
-                    DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Enabled", False)
+                    DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Enabled", "Warning")
 
 
 def is_host_subscribed(server_name, dict_to_modify, subscript_status):
