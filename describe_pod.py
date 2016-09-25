@@ -56,14 +56,15 @@ def process_ssh_output(output):
     exposed_ports_start = False
     for ssh_lines in output.split("\n"):
         # All values split the same way so its more efficient to put it in a variable
-        ssh_line_value = ssh_lines.split(": ")[1].replace(",", "")
+        if ": " in ssh_lines:
+            ssh_line_value = ssh_lines.split(": ")[1].replace(",", "")
         if '"Running":' in ssh_lines:
             container_running = ssh_line_value
         if '"StartedAt":' in ssh_lines:
             container_start_time = ssh_line_value
         if '"OOMKilled":' in ssh_lines:
             oomkilled = ssh_line_value
-        if '"RestartCount:"' in ssh_lines:
+        if '"RestartCount":' in ssh_lines:
             restart_count = ssh_line_value
         if '"ExposedPorts": {' in ssh_lines:
             exposed_ports_start = True
@@ -74,12 +75,27 @@ def process_ssh_output(output):
     return(list_of_ports, container_running, container_start_time, oomkilled, restart_count)
 
 
+def format_output(text_to_print):
+    # This is a hack because I am assuming I have nothing outside of the stdlib available
+    longest_line = 0
+    for line in text_to_print:
+        heading = line.split(": ")[0] + ":"
+        if len(heading) > longest_line:
+            longest_line = len(heading)
+    for line_second_pass in text_to_print:
+        value = line_second_pass.split(": ")[1]
+        heading = line_second_pass.split(": ")[0] + ":"
+        while len(heading) < longest_line - 1:
+            heading += " "
+        print(heading + "\t" + value)
+
+
 for line in oc_describe.split("\n"):
     if line.startswith("Node:"):
         node_name = line.split()[1].split("/")[0]
-        print("Beginning docker inspect on remote node: %s" % node_name)
+        print("Beginning docker inspect on remote node: %s\n" % node_name)
     elif line.startswith("    Image:"):
-        docker_image = line.split(":")[1].strip()
+        docker_image = line.split("Image:")[1].strip().split("@")[0]
         add_to_dictionary(docker_information, docker_image, docker_container_id, port_list)
     elif line.startswith("    Container ID:"):
         docker_container_id = line.split("//")[1]
@@ -90,21 +106,24 @@ for line in oc_describe.split("\n"):
         ssh_output = os.popen("ssh -t %s '%s' 2> /dev/null" % (node_name, ssh_command)).read()
         port_list, container_is_running, container_start_time, oom_killed, restart_counter = process_ssh_output(ssh_output)
 
+
+list_of_options_to_print = []
+
 for key in docker_information.keys():
     container_id = docker_information[key].keys()[0]
     image_id = key
     open_ports = docker_information[image_id][container_id]
-    print("Image ID: %s" % image_id)
-    print("Container: %s" % container_id)
+    list_of_options_to_print.append("Image ID: %s" % image_id)
+    list_of_options_to_print.append("Container: %s" % container_id)
     if options.exposed_port:
-        print("Exposed ports: %s" % open_ports)
+        list_of_options_to_print.append("Exposed ports: %s" % open_ports)
     if options.container_start_time:
-        print("Container start time: %s" % container_start_time)
+        list_of_options_to_print.append("Container start time: %s" % container_start_time)
     if options.container_restart_count:
-        print("Container restarts: %s" % restart_counter)
+        list_of_options_to_print.append("Container restarts: %s" % restart_counter)
     if options.container_running:
-        print("Container status: %s" % container_is_running)
+        list_of_options_to_print.append("Container status: %s" % container_is_running)
     if options.oom_killed:
-        print("Container OOM killed: %s" % oom_killed)
-    print("\n")
+        list_of_options_to_print.append("Container OOM killed: %s" % oom_killed)
 
+format_output(list_of_options_to_print)
