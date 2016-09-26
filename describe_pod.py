@@ -113,7 +113,7 @@ for key in docker_information.keys():
     container_id = docker_information[key].keys()[0]
     image_id = key
     open_ports = docker_information[image_id][container_id]
-    list_of_options_to_print.append("Image ID: %s" % image_id)
+    list_of_options_to_print.append("\nImage ID: %s" % image_id)
     list_of_options_to_print.append("Container: %s" % container_id)
     if options.exposed_port:
         list_of_options_to_print.append("Exposed ports: %s" % open_ports)
