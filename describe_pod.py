@@ -90,6 +90,8 @@ def format_output(text_to_print):
         print(heading + "\t" + value)
 
 
+container_dict = {}
+
 for line in oc_describe.split("\n"):
     if line.startswith("Node:"):
         node_name = line.split()[1].split("/")[0]
@@ -105,7 +107,7 @@ for line in oc_describe.split("\n"):
             ssh_command = "sudo docker inspect %s |grep %s; " % (docker_container_id, options.port)
         ssh_output = os.popen("ssh -t %s '%s' 2> /dev/null" % (node_name, ssh_command)).read()
         port_list, container_is_running, container_start_time, oom_killed, restart_counter = process_ssh_output(ssh_output)
-
+        container_dict[docker_container_id] = [port_list, container_is_running, container_start_time, oom_killed, restart_counter]
 
 list_of_options_to_print = []
 
@@ -118,12 +120,12 @@ for key in docker_information.keys():
     if options.exposed_port:
         list_of_options_to_print.append("Exposed ports: %s" % open_ports)
     if options.container_start_time:
-        list_of_options_to_print.append("Container start time: %s" % container_start_time)
+        list_of_options_to_print.append("Container start time: %s" % container_dict[container_id][2])
     if options.container_restart_count:
-        list_of_options_to_print.append("Container restarts: %s" % restart_counter)
+        list_of_options_to_print.append("Container restarts: %s" % container_dict[container_id][4])
     if options.container_running:
-        list_of_options_to_print.append("Container status: %s" % container_is_running)
+        list_of_options_to_print.append("Container running: %s" % container_dict[container_id][1])
     if options.oom_killed:
-        list_of_options_to_print.append("Container OOM killed: %s" % oom_killed)
+        list_of_options_to_print.append("Container OOM killed: %s" % container_dict[container_id][3])
 
 format_output(list_of_options_to_print)
