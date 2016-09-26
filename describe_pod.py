@@ -105,7 +105,7 @@ for line in oc_describe.split("\n"):
             ssh_command = "sudo docker inspect %s; " % docker_container_id
         else:
             ssh_command = "sudo docker inspect %s |grep %s; " % (docker_container_id, options.port)
-        ssh_output = os.popen("ssh -t %s '%s' 2> /dev/null" % (node_name, ssh_command)).read()
+        ssh_output = os.popen("ssh -o StrictHostKeyChecking=no -t %s '%s' 2> /dev/null" % (node_name, ssh_command)).read()
         port_list, container_is_running, container_start_time, oom_killed, restart_counter = process_ssh_output(ssh_output)
         container_dict[docker_container_id] = [port_list, container_is_running, container_start_time, oom_killed, restart_counter]
 
