@@ -47,6 +47,47 @@ class DictionaryHandling:
             dictionary[name_of_server] = {component: value}
 
     @staticmethod
+    def format_output(text_to_print):
+        # This is a hack because I am assuming I have nothing outside of the stdlib available
+        longest_line = 0
+        for line in text_to_print.split("\n"):
+            if line.strip():
+                server_name = line.split()[0]
+                line_without_server = line.replace("%s " % server_name, "")
+                heading = line_without_server.split(": ")[0] + ":"
+                if len(heading) > longest_line:
+                    longest_line = len(heading)
+        previous_heading = ""
+
+        for line_second_pass in text_to_print.split("\n"):
+            if line_second_pass.strip():
+                server_name = line_second_pass.split()[0]
+                value = line_second_pass.split(": ")[1]
+                heading = " ".join(line_second_pass.split()[1:]).split(": ")[0] + ":"
+                while len(heading) < longest_line:
+                    heading += " "
+                # Only print the server name once
+                if previous_heading != server_name:
+                    print("\n\t" + textColors.OKBLUE + server_name + textColors.ENDC)
+                previous_heading = server_name
+                # All dictionaries should have either True or False in order to be colourized
+                # True will be coloured Green, False will be Red. Anything else will be highlighted
+                if "False" in value:
+                    print(textColors.FAIL),
+                elif "docker" in heading.lower():
+                    print(textColors.WARNING),
+                elif "True" in value:
+                    print(textColors.OKGREEN),
+                # If the file has been modified mark it yellow as we cannot know whether it is correctly
+                # modified or not
+                elif "sum" in heading:
+                    print(textColors.WARNING),
+                elif "available" in heading:
+                    print(textColors.WARNING),
+                print("\t\t" + heading + "\t" + value)
+                print(textColors.ENDC),
+
+    @staticmethod
     def format_dictionary_output(*args):
         temporary_dict = {}
         temp_list = []
@@ -61,7 +102,6 @@ class DictionaryHandling:
 
         # This section prints the server name as a heading in the output
         for server_name in temporary_dict.keys():
-            print("\n\t" + textColors.OKBLUE + server_name + textColors.ENDC)
             for incoming_dictionary in temporary_dict[server_name]:
                 # Turn the dictionaries into a list so that I can sort the output
                 temp_var = server_name + " " + incoming_dictionary + " : " + \
@@ -69,25 +109,4 @@ class DictionaryHandling:
                 temp_list.append(temp_var)
             temp_list.sort()
 
-            # All dictionaries should have either True or False in order to be colourized
-            # True will be coloured Green, False will be Red. Anything else will be highlighted
-            for output in temp_list:
-                if server_name in output.split()[0]:
-                    if "True" in output:
-                        # If the file has been modified mark it yellow as we cannot know whether it is correctly
-                        # modified or not
-                        if "sum" in output:
-                            output = " :".join(output.split(":")[:-1])
-                            print(textColors.WARNING + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                        else:
-                            print(textColors.OKGREEN + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                    elif "False" in output or "None" in output or "" in output.split()[:-1] or "Missing" in output:
-                        # If the file hasn't been modified, we want to throw the fail colour because default
-                        # values will not work for OSE
-                        if "sum" in output:
-                            output = " :".join(output.split(":")[:-1])
-                        print(textColors.FAIL + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                    elif "available" in output.lower() or "Warning" in output.lower():
-                        print(textColors.WARNING + "\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
-                    else:
-                        print("\t\t" + " ".join(output.split()[1:]) + textColors.ENDC)
+        DictionaryHandling.format_output("\n".join(temp_list))
