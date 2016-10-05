@@ -6,16 +6,7 @@ import os
 import json
 
 
-def add_to_dictionary(dictionary, image_name, container_identification, value):
-    """Add items to a dictionary. The items will be stored in a multidimensional array
-    {image_name: {container id : [list of values]}"""
-    if image_name in dictionary:
-        dictionary[container_identification][image_name].append(value)
-    else:
-        dictionary[container_identification] = {image_name: [value]}
-
-
-def examin_dcs(deployment_name):
+def examine_deployment_configs(deployment_name):
     command = "sudo oc describe dc %s" % deployment_name
     output = os.popen(command).read()
     component_label = None
@@ -31,25 +22,29 @@ def examin_dcs(deployment_name):
                     successful_deployment = True
                 else:
                     successful_deployment = False
-        if line.startswith("  Selector:"):
-            component_label = line.split(":")[1].strip()
+        # Look for the first occurance of Selector and pull out the name=<comp> to match with the pod
+        if "Selector:" in line:
+            if component_label is None:
+                component_label = line.split(":")[1].strip()
     if successful_deployment:
         print("Latest deploment has succeeded")
-        return(None)
+        return(component_label)
     else:
         return(component_label)
 
 pod_status_dict = {}
 
 for deployment_config_name in open("report-dc").readlines():
-    pod_label = examin_dcs(deployment_config_name)
+    pod_label = examine_deployment_configs(deployment_config_name)
     if pod_label is not None:
         json_data = json.loads(os.popen("sudo oc get pod -l %s -o json" % pod_label).read())
         for pod in json_data['items'][0]['status']['containerStatuses']:
-            pod_id = pod['containerID'].split("//")[1]
+            pod_id = str(pod['containerID'].split("//")[1])
             pod_status = pod['ready']
-            component_name = pod['name']
-            add_to_dictionary(pod_status_dict, component_name, pod_id, pod_status)
+            component_name = str(pod['name'])
+            pod_status_dict[component_name] = {pod_id : pod_status }
 
-print(pod_status_dict)
-
+for first_key in pod_status_dict.keys():
+    for second_key, value in pod_status_dict[first_key].keys():
+        if second_key:
+            print(second_key)
