@@ -3,48 +3,68 @@
 # If a failure has occurred, it will link the deployment config to a specific pod.
 
 import os
+import sys
 import json
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-c', action='store', dest='component_name', help='Pass in the list of component labels'
+                    ' associated with deployment configs', required=True)
+options = parser.parse_args()
 
 
-def examine_deployment_configs(deployment_name):
-    command = "sudo oc describe dc %s" % deployment_name
-    output = os.popen(command).read()
-    component_label = None
-    start_parsing = False
-    for line in output.split("\n"):
-        if "(latest)" in line and "Deployment" in line:
-            start_parsing = True
-        if "Replicas:" in line:
-            start_parsing = False
-        if start_parsing:
-            if "Status:" in line:
-                if line.split(":")[1].strip() == "Complete":
-                    successful_deployment = True
-                else:
-                    successful_deployment = False
-        # Look for the first occurance of Selector and pull out the name=<comp> to match with the pod
-        if "Selector:" in line:
-            if component_label is None:
-                component_label = line.split(":")[1].strip()
-    if successful_deployment:
-        print("Latest deploment has succeeded")
-        return(component_label)
+def process_deployment_config_json(command):
+    cmd_output = os.popen(command).read()
+    json_data = json.loads(cmd_output)
+    component_dict = {}
+    for component in json_data['items']:
+        component_name = str(component['metadata']['name'])
+        component_label = "name=" + str(component['metadata']['labels']['name'])
+        latest_version = int(component['status']['latestVersion'])
+        component_dict[component_name] = [component_label, latest_version]
+    return (component_dict)
+
+
+def process_pod_json(command, incoming_dict):
+    cmd_output = os.popen(command).read()
+    json_data = json.loads(cmd_output)
+    container_failed = False
+    if json_data['items']:
+        for component in json_data['items']:
+            component_name = str(component['metadata']['name'])
+            pod_id = str(component['status']['containerStatuses'][0]['containerID'].split("//")[1])
+            for container in component['status']['containerStatuses']:
+                if not container['ready']:
+                    container_failed = True
+            # The api can report that a pod is {ready: True} even if a container is down
+            # Therefore, flag the pod as not ready
+            if container_failed:
+                incoming_dict[component_name] = {pod_id : False}
+            else:
+                incoming_dict[component_name] = {pod_id: True}
     else:
-        return(component_label)
+        # instead of reparsing output, just parse the command. Since this component is failing
+        # the api has no information about the failed pod and thus no easy way to return this info
+        missing_component = command.split("-l")[1].split("-o")[0].strip()
+        incoming_dict[missing_component] = {None: False}
 
-pod_status_dict = {}
-
-for deployment_config_name in open("report-dc").readlines():
-    pod_label = examine_deployment_configs(deployment_config_name)
-    if pod_label is not None:
-        json_data = json.loads(os.popen("sudo oc get pod -l %s -o json" % pod_label).read())
-        for pod in json_data['items'][0]['status']['containerStatuses']:
-            pod_id = str(pod['containerID'].split("//")[1])
-            pod_status = pod['ready']
-            component_name = str(pod['name'])
-            pod_status_dict[component_name] = {pod_id : pod_status }
-
-for first_key in pod_status_dict.keys():
-    for second_key, value in pod_status_dict[first_key].keys():
-        if second_key:
-            print(second_key)
+if __name__ == "__main__":
+    pod_status_dict = {}
+    deployment_config_label = "internal.acs.amadeus.com/component=%s" % options.component_name
+    get_dc_command = "sudo oc get dc -l %s -o json" % deployment_config_label
+    component_attributes = process_deployment_config_json(get_dc_command)
+    for first_key in component_attributes.keys():
+        get_pod_command = "sudo oc get pod -l %s -o json" % component_attributes[first_key][0]
+        process_pod_json(get_pod_command, pod_status_dict)
+    exit_with_error = False
+    for key in pod_status_dict.keys():
+        for value in pod_status_dict[key].values():
+            if not value:
+                if "name" in key:
+                    print("This component did not deploy at all:      \t%s" % key)
+                else:
+                    print("This component has container(s) not ready: \t%s" % key)
+                exit_with_error = True
+    if exit_with_error:
+        sys.exit(1)
