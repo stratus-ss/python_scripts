@@ -10,7 +10,8 @@ from tools.common import textColours
 from tools import ssh, common
 import openshift.cluster
 
-parser = argparse.ArgumentParser(description='%s    Updates the environment file with new components/blueprints'
+parser = argparse.ArgumentParser(description='%s    Validates that all containers in a pod are up as well as '
+                                             'ensuring that all pods are on the correct deployment version.'
                                                  '%s' % (textColours.BOLD, textColours.ENDC),
                                  epilog='%s \nSample usage: %s --env-file conf/env/tec-qa.env.conf '
                                         ' --comp ahp-booking \n%s' % (textColours.HIGHLIGHT, sys.argv[0],
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     get_dc_command = "sudo oc get dc -l %s -o json" % deployment_config_label
 
     # This is the file which will have the deployer name in it if there is a failure
-    filename = "/tmp/deployer_name"
+    filename = "/tmp/deployer_cleanup"
     # Attempt to remove the file from a previous run to ensure the file is always empty
     try:
         os.remove(filename)
@@ -123,8 +124,9 @@ if __name__ == "__main__":
                         cmd_output = os_master_session.get_cmd_output(command)
                         deployer_json_data = json.loads(cmd_output)
                         deployer_name = deployer_json_data['items'][0]['metadata']['name']
+                        deployer_and_component = options.component_name + " : " + deployer_name
                         write_file = open(filename, "a")
-                        write_file.write(deployer_name)
+                        write_file.write(deployer_and_component)
                         write_file.write("\n")
                 else:
                     sys.stderr.write("%sThis component has container(s) not ready: \t%s\n" % (textColours.FAIL, key))

@@ -71,9 +71,12 @@ def update_config(component_and_version, config_file):
 
 if __name__ == "__main__":
 
-    list_of_components = options.component_name + options.blue_print
+    if options.blue_print is not None:
+        list_of_components = options.component_name + options.blue_print
+    else:
+        list_of_components = options.component_name
     todays_date = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M")
-    backup_location = "/tmp/%s_%s" % (options.config_file, todays_date)
+    backup_location = "%s.backup" % options.config_file
     shutil.copyfile(options.config_file, backup_location)
     print("physical file backed up to: %s" % backup_location)
 
