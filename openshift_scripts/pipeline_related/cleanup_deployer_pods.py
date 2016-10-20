@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description='%s    destroys any deployer pods l
                                  formatter_class=argparse.RawTextHelpFormatter)
 
 parser.add_argument('--cleanup-file', action='store', dest='cleanup_file',
-                    help='(optional) A file with a list of deployer pods to remove')
+                    help='A file with a list of deployer pods to remove')
 
 parser.add_argument('--env-file', action='store', dest='env_file',
                     help='The config file for the environment', required=True)

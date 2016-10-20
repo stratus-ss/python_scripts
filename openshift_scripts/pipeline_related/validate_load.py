@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     deployment_config_label = "internal.acs.amadeus.com/component=%s" % options.component_name
     get_dc_command = "sudo oc get dc -l %s -o json" % deployment_config_label
-
+    close_file = False
     # This is the file which will have the deployer name in it if there is a failure
     filename = "/tmp/deployer_cleanup"
     # Attempt to remove the file from a previous run to ensure the file is always empty
@@ -105,8 +105,11 @@ if __name__ == "__main__":
             if component_attributes[first_key][second_key] != deployment_version_dict[first_key][second_key]:
                 # If there is a problem, store the data with the component name, in the same way that it is stored
                 # if there are no pods running. i.e. name=component. This allows consistent error handling
+                # Swap the first_key and second_key to normalize the data in the dict
                 pod_status_dict.pop(first_key)
                 pod_status_dict[second_key] = {first_key: False}
+                # At this point the dict looks like:
+                # pod_status_dict['name=ahp-report-audit-dmn'] = {'report-audit-dmn-deployment': False}
 
     for key in pod_status_dict.keys():
         for second_key, value in pod_status_dict[key].iteritems():
@@ -123,14 +126,24 @@ if __name__ == "__main__":
                                   (second_key, component_attributes[second_key][key])
                         cmd_output = os_master_session.get_cmd_output(command)
                         deployer_json_data = json.loads(cmd_output)
-                        deployer_name = deployer_json_data['items'][0]['metadata']['name']
-                        deployer_and_component = options.component_name + " : " + deployer_name
-                        write_file = open(filename, "a")
-                        write_file.write(deployer_and_component)
-                        write_file.write("\n")
+                        try:
+                            deployer_name = deployer_json_data['items'][0]['metadata']['name']
+                            deployer_and_component = options.component_name + " : " + deployer_name
+                            write_file = open(filename, "a")
+                            write_file.write(deployer_and_component)
+                            write_file.write("\n")
+                            close_file = True
+                        except IndexError:
+                            write_error_file = open("/tmp/nothing_to_clean", "w")
+                            write_error_file.write("%s has no deployer pod left behind" % second_key)
+                            write_error_file.close()
+                            sys.stderr.write("%sThere was a failure during deployment but no deployer pods found "
+                                             "to clean up" % textColours.FAIL)
+                            sys.exit(2)
                 else:
                     sys.stderr.write("%sThis component has container(s) not ready: \t%s\n" % (textColours.FAIL, key))
                 exit_with_error = True
-    write_file.close()
+    if close_file:
+        write_file.close()
     if exit_with_error:
         sys.exit(1)

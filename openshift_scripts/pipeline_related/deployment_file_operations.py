@@ -5,23 +5,12 @@
 # If the version is not the same, the config file will be updated and eventually checked into stash
 
 import sys
+import os
 import argparse
 import fileinput
 import shutil
 import datetime
-
-
-class textColours:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    HIGHLIGHT = '\033[96m'
-
+from tools.common import textColours
 
 parser = argparse.ArgumentParser(description='%s    Updates the environment file with new components/blueprints'
                                                  '%s' % (textColours.BOLD, textColours.ENDC),
@@ -50,27 +39,71 @@ def script_input_check(component_to_check):
             parser.print_help()
             sys.exit(1)
 
+def add_to_dictionary(dictionary, name_of_component, component_type, version):
+        if name_of_component in dictionary:
+            dictionary[name_of_component][component_type] = version
+        else:
+            dictionary[name_of_component] = {component_type: version}
 
-def update_config(component_and_version, config_file):
+def update_config(component_and_version, config_file, previous_version_dict):
     component_name = component_and_version.split(":")[0].strip()
     proposed_component_version = component_and_version.split(":")[1].strip()
     for line in fileinput.FileInput(config_file, inplace=1):
         if not line.isspace():
             if line.split()[0] == component_name:
                 current_component_version_number = line.split(" = ")[1].strip()
+                add_to_dictionary(previous_version_dict, component_name, "component_name",
+                                                                         current_component_version_number)
                 print(component_name + " = " + proposed_component_version)
                 if current_component_version_number == proposed_component_version:
                     sys.stderr.write("%s Component version already exists in file: %s\n" % (textColours.FAIL,
                                                                                             component_and_version))
                     sys.exit(1)
+            elif line.split()[0] == component_name + "_env":
+                current_component_env_version = line.split(" = ")[1].strip()
+                add_to_dictionary(previous_version_dict, component_name, "component_env_version",
+                                                                         current_component_env_version)
+                print(line),
             else:
                 print(line),
         else:
             print(line),
 
 
+def format_string_to_json(component_and_env_dict):
+    filename = "/tmp/rollback_version"
+    close_file = False
+    env_string = None
+    # Attempt to remove any previous files, if none exists just eat the error
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
+    for component in component_and_env_dict.keys():
+        for key, version in component_and_env_dict[component].iteritems():
+            if key == "component_env_version":
+                env_string = '"env_version":{"current":"%s","new":"%s"}}' % (version, version)
+            if key == "component_name":
+                component_string = '"%s":{"version":{"current":"%s","new":"%s"}' % (component, version, version)
+        if env_string is not None:
+            json_string = '{%s,"type":"acs",%s}' % (component_string, env_string)
+
+            # Check if the file has already been created. If it does append to the file, if not do a write operation
+            # The file should only exist at this point if it has had current json data written to it
+            if os.path.isfile(filename):
+                write_file = open(filename, "a")
+            else:
+                write_file = open(filename, "w")
+            write_file.write(json_string)
+            write_file.write("\n")
+            close_file = True
+    if close_file:
+        write_file.close()
+
 if __name__ == "__main__":
 
+    # This dict stores the component and the previous version to track in case of rollback
+    previous_component_version_dict = {}
     if options.blue_print is not None:
         list_of_components = options.component_name + options.blue_print
     else:
@@ -82,7 +115,7 @@ if __name__ == "__main__":
 
     script_input_check(options.component_name)
     for component in list_of_components:
-        update_config(component, options.config_file)
+        update_config(component, options.config_file, previous_component_version_dict)
 
-
+    format_string_to_json(previous_component_version_dict)
 
