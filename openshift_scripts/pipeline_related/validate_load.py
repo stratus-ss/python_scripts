@@ -62,10 +62,13 @@ def process_pod_json(command, status_dict, version_dict, component_label, incomi
         status_dict[missing_component] = {None: False}
 
 
-def inspect_load_state(component_to_inspect):
+def inspect_load_state(component_to_inspect, gateway_session, pod_status_dict, deployment_version_dict,
+                       container_status_dict ):
+
     deployment_config_label = "internal.acs.amadeus.com/component=%s" % component_to_inspect
     get_dc_command = "sudo oc get dc -l %s -o json" % deployment_config_label
     close_file = False
+    deployer_and_component = None
     # This is the file which will have the deployer name in it if there is a failure
     filename = "/tmp/deployer_cleanup"
     # Attempt to remove the file from a previous run to ensure the file is always empty
@@ -106,43 +109,51 @@ def inspect_load_state(component_to_inspect):
                 # pod_status_dict['name=ahp-report-audit-dmn'] = {'report-audit-dmn-deployment': False}
 
     for key in pod_status_dict.keys():
+        log.info("Validating component: %s" % key)
         for second_key, value in pod_status_dict[key].iteritems():
             if not value:
                 if "name" in key:
-                    sys.stderr.write("%sThis component did not deploy at all:      \t%s\n" % (textColours.FAIL, key))
+                    log.warning("%sThis component did not deploy at all:      \t%s\n" % (textColours.FAIL, key))
                     # name=component will be in the key if there was a problem
                     # The second key will be empty if the problem was that the pod did not exist. Usually when a pod
                     # no longer exists, there is no longer a deployer pod kicking around.
                     # This will get the name of the deployer pod and write it to a file for cleanup before
                     # failing back to the previous build
-                    if second_key is not None:
-                        command = "sudo oc get pod -l openshift.io/deployer-pod-for.name=%s-%s -o json" % \
-                                  (second_key, component_attributes[second_key][key])
+                    deployer_name = second_key + "-" + str(component_attributes[second_key][key]) + "-deploy"
+
+                else:
+                    print("%sThis component has container(s) not ready: \t%s\n" % (textColours.FAIL, key)),
+                    print("\nContainer infomration from failure:\n"),
+                    for container in container_status_dict.keys():
+                        print("\tDocker image name: %s\n" % (container_status_dict[container])),
+                        print("\tContainer name: %s\n" % container)
+                if second_key is not None:
+                    try:
+                        try:
+                            int(second_key.split("-")[-1])
+                        except ValueError:
+                            second_key = "-".join(second_key.split("-")[:-1])
+                        command = "sudo oc get pod -l openshift.io/deployer-pod-for.name=%s -o json" % \
+                                  (second_key)
+                        log.info("Running command: %s" % command)
                         cmd_output = os_master_session.get_cmd_output(command)
                         deployer_json_data = json.loads(cmd_output)
-                        try:
-                            deployer_name = deployer_json_data['items'][0]['metadata']['name']
-                            deployer_and_component = component_to_inspect + " : " + deployer_name
-                            write_file = open(filename, "a")
-                            write_file.write(deployer_and_component)
-                            write_file.write("\n")
-                            close_file = True
-                        except IndexError:
-                            write_error_file = open("/tmp/nothing_to_clean", "w")
-                            write_error_file.write("%s has no deployer pod left behind" % second_key)
-                            write_error_file.close()
-                            sys.stderr.write("%sThere was a failure during deployment but no deployer pods found "
-                                             "to clean up" % textColours.FAIL)
-                            sys.exit(2)
-                else:
-                    sys.stderr.write("%sThis component has container(s) not ready: \t%s\n" % (textColours.FAIL, key))
-                    sys.stderr.write("\nContainer infomration from failure:\n")
-                    for container in container_status_dict.keys():
-                        sys.stderr.write("\tDocker image name: %s\n" % (container_status_dict[container]))
-                        sys.stderr.write("\tContainer name: %s\n" % container)
-
-                exit_with_error = True
+                        deployer_name = deployer_json_data['items'][0]['metadata']['name']
+                        log.warning("Deployer pod found in pod json for %s, writing %s" % (deployer_name, filename))
+                    except IndexError:
+                        log.warning("%sNo deployer pods found to clean up for: %s" % (textColours.FAIL, second_key))
+                    except KeyError:
+                        print("key error")
+                        pass
+                deployer_and_component = component_to_inspect + " : " + deployer_name
+                if deployer_and_component is not None:
+                    write_file = open(filename, "a")
+                    write_file.write(deployer_and_component)
+                    write_file.write("\n")
+                    close_file = True
+                    exit_with_error = True
     if close_file:
+        log.debug("%s has been written" % filename)
         write_file.close()
     return(exit_with_error)
 
@@ -173,6 +184,7 @@ if __name__ == "__main__":
     gateway_ip = common.get_gateway_ip()
     env_options = common.get_env_options()
     gateway_session = ssh.SSHSession(gateway_ip, user)
+    admin01_session = gateway_session.get_remote_session('admin01')
     error_encountered = []
     if options.diff_file:
         diff_file_data = open(options.diff_file).read()
@@ -180,17 +192,21 @@ if __name__ == "__main__":
             pod_status_dict = {}
             deployment_version_dict = {}
             container_status_dict = {}
-            error_encountered.append(inspect_load_state(component))
+            error_encountered.append(inspect_load_state(component, admin01_session, pod_status_dict,
+                                                         deployment_version_dict, container_status_dict))
 
     if options.component_name:
         pod_status_dict = {}
         deployment_version_dict = {}
         container_status_dict = {}
-        error_encountered.append(inspect_load_state(options.component_name))
+        error_encountered.append(inspect_load_state(options.component_name, admin01_session, pod_status_dict,
+                                                    deployment_version_dict, container_status_dict))
 
     for exits in error_encountered:
         if exits == True:
             number_of_errors = error_encountered.count(True)
-            sys.stderr.write("\n%s%s components had errors during this validation check\n" % (textColours.FAIL,
+            log.error("\n%s%s components had errors during this validation check\n" % (textColours.FAIL,
                                                                                               number_of_errors))
             sys.exit(1)
+        else:
+            print("Validate has completed")
