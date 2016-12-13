@@ -250,6 +250,8 @@ def which_repos_are_enabled(server_name, dict_to_modify, repo_info, these_should
     """
     repo_id_keyword = "Repo ID:"
     repo_enabled_keyword = "Enabled:"
+    if not repo_info:
+        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Error retrieving repo information", False)
     for line in repo_info:
         if repo_id_keyword in line:
             repo_name = line.split(repo_id_keyword)[1].strip()
