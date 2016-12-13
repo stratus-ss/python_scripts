@@ -20,12 +20,11 @@ from optparse import OptionParser
 ImportHelper.import_error_handling("paramiko", globals())
 
 
-ansible_ssh_user = "root"
 docker_files_have_been_modified_dict = {}
 remote_docker_file_sums_dict = {}
 docker_service_check_dict = {}
 # These may need to be updated occasionally in the event that the default options change
-original_docker_file_hashes = \
+original_docker_file_hashes_OCP_31 = \
            {"/etc/sysconfig/docker": "1fe04a24430eaefb751bf720353e730aec5641529f0a3b2567f72e6c63433e8b",
             "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
             "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
@@ -51,7 +50,13 @@ parser = OptionParser()
 parser.add_option('--ansible-host-file', dest='ansible_host_file', help='Specify location of ansible hostfile')
 parser.add_option('--show-sha-sums', dest='show_sha_sums', help='Toggle whether or not to show the sha sum of files'
                                                                 'on remote host')
+parser.add_option('--ansible-ssh-user', dest='ansible_ssh_user', help='Which user will ansible be run as')
 (options, args) = parser.parse_args()
+
+if options.ansible_ssh_user:
+    ansible_ssh_user = options.ansible_ssh_user
+else:
+    ansible_ssh_user = "root"
 
 
 def is_selinux_enabled(host, ssh_obj, dict_to_modify):
@@ -315,7 +320,7 @@ if __name__ == "__main__":
         if can_connect_to_server:
             ssh_connection.open_ssh(server, ansible_ssh_user)
             check_docker_files(server, ssh_connection, docker_files_have_been_modified_dict,
-                               original_docker_file_hashes, remote_docker_file_sums_dict)
+                               original_docker_file_hashes_OCP_31, remote_docker_file_sums_dict)
             installed_package_query(server, repo_dict, ose_required_packages_list, ssh_connection)
             update_required_query(server, package_updates_available_dict, ose_required_packages_list, ssh_connection)
             is_selinux_enabled(server, ssh_connection, selinux_dict)
