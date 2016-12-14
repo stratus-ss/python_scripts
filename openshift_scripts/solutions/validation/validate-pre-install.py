@@ -70,13 +70,12 @@ ose_required_packages_list = ["wget", "git", "net-tools", "bind-utils", "iptable
                               "bash-completion", "atomic-openshift-utils", "docker"]
 
 
-
 def is_selinux_enabled(host, ssh_obj, dict_to_modify):
     """
     is_selinux_enabled logs into the remote host and runs/parses 'sestatus'
     adds results to a dictionary
     """
-    output = HandleSSHConnections.run_remote_commands(ssh_obj, "sestatus")
+    output = HandleSSHConnections.run_remote_commands(ssh_obj, "/usr/sbin/sestatus")
     for line in output:
         if "SELinux status" in line:
             if "enabled" in line:
