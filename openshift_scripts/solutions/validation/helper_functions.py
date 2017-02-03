@@ -75,7 +75,10 @@ class DictionaryHandling:
                 if "False" in value or "None" in value:
                     print(textColors.FAIL),
                 elif "docker" in heading.lower():
-                    print(textColors.WARNING),
+                    if "True" in value:
+                        print(textColors.OKGREEN),
+                    else:
+                        print(textColors.WARNING),
                 elif "True" in value:
                     print(textColors.OKGREEN),
                 # If the file has been modified mark it yellow as we cannot know whether it is correctly

@@ -84,6 +84,10 @@ def is_selinux_enabled(host, ssh_obj, dict_to_modify):
                 DictionaryHandling.add_to_dictionary(dict_to_modify, host, "SELinux Enabled", False)
 
 
+def check_selinux_booleans():
+    pass
+
+
 def process_host_file(ansible_host_file):
     # This section should parse the ansible host file for hosts
     # This parses the host file with a similar format to ini files
@@ -119,6 +123,7 @@ def test_ssh_keys(host, user):
     returns True if the connection is accepted and False if Paramiko throws an exception
     """
     try:
+        print(textColors.HEADER + "Attempting to make a remote SSH connection..." + textColors.ENDC)
         ssh_connection.open_ssh(host, user)
         ssh_connection.close_ssh()
         ssh_connection_succeed = True
@@ -204,7 +209,6 @@ def is_docker_running(server_name, output, dict_to_modify):
                     docker_running = True
                     active_since = line
     if docker_running:
-        print("Docker is active")
         DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "Docker Running", True)
     else:
         print("Docker is not running: \n")
@@ -328,24 +332,34 @@ if __name__ == "__main__":
 
     ansible_host_list = process_host_file(options.ansible_host_file)
     for server in ansible_host_list:
+        print("\n")
         can_connect_to_server = test_ssh_keys(server, ansible_ssh_user)
         # if we can connect to remote host, go ahead and run the verification checks
         if can_connect_to_server:
             ssh_connection.open_ssh(server, ansible_ssh_user)
             check_docker_files(server, ssh_connection, docker_files_have_been_modified_dict,
                                original_docker_file_hashes_OCP_31, remote_docker_file_sums_dict)
+            print(textColors.HEADER + "Running 'yum list installed' on %s..." % server + textColors.ENDC)
             installed_package_query(server, repo_dict, ose_required_packages_list, ssh_connection)
+            print(textColors.HEADER + "Running 'yum list updates' on %s..." % server + textColors.ENDC)
             update_required_query(server, package_updates_available_dict, ose_required_packages_list, ssh_connection)
+
+            print(textColors.HEADER + "Running 'sestatus' on %s" % server + textColors.ENDC)
             is_selinux_enabled(server, ssh_connection, selinux_dict)
+            print(textColors.HEADER + "Running 'systemctl status docker' on %s..." % server + textColors.ENDC)
             systemctl_output = HandleSSHConnections.run_remote_commands(ssh_connection, "systemctl status docker")
             is_docker_enabled(server, systemctl_output, docker_service_check_dict)
             is_docker_running(server, systemctl_output, docker_service_check_dict)
+            print(textColors.HEADER + "Running 'subscription-manager status' on %s..." % server + textColors.ENDC)
             sub_status = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager status")
             is_host_subscribed(server, subscription_dict, sub_status)
+            print(textColors.HEADER + "Running 'subscription-manager repos' on %s..." % server + textColors.ENDC)
             repo_information = HandleSSHConnections.run_remote_commands(ssh_connection, "subscription-manager repos")
             which_repos_are_enabled(server, repo_dict, repo_information, ose_repos)
             ssh_connection.close_ssh()
+        print(textColors.HEADER + "Attempting to forward lookup of %s..." % server + textColors.ENDC)
         check_forward_dns_lookup(server, forward_lookup_dict)
+        print(textColors.HEADER + "Attempting to reverse lookup of %s..." % server + textColors.ENDC)
         check_reverse_dns_lookup(forward_lookup_dict, reverse_lookup_dict)
 
     ##### Format output and display summary
