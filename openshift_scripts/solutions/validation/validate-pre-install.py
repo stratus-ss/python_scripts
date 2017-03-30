@@ -13,7 +13,6 @@ from helper_functions import DictionaryHandling
 from helper_functions import ImportHelper
 from helper_functions import textColors
 from ssh_connection_handling import HandleSSHConnections
-import yum
 import sys
 from optparse import OptionParser
 
@@ -31,6 +30,9 @@ parser.add_option('--show-sha-sums', dest='show_sha_sums', help='Toggle whether 
                                                                 'on remote host')
 parser.add_option('--ansible-ssh-user', dest='ansible_ssh_user', help='Which user will ansible be run as')
 parser.add_option('--openshift-version', dest='openshift_version', help='The version of openshift to check against')
+parser.add_option('--private-registry', dest='private_registry', action='store_true', help='Indicates whether or not you are '
+                                                                                  'using a private registry for '
+                                                                                  'installation')
 (options, args) = parser.parse_args()
 
 if options.ansible_ssh_user:
@@ -42,10 +44,20 @@ docker_files_have_been_modified_dict = {}
 remote_docker_file_sums_dict = {}
 docker_service_check_dict = {}
 # These may need to be updated occasionally in the event that the default options change
-original_docker_file_hashes_OCP_31 = \
+original_docker_file_hashes_docker_1_8 = \
            {"/etc/sysconfig/docker": "1fe04a24430eaefb751bf720353e730aec5641529f0a3b2567f72e6c63433e8b",
             "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
             "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
+
+original_docker_file_hashes_docker_1_10 = \
+    {"/etc/sysconfig/docker": "039fe97a6866ae8d5da8947b622975ebfa1f495c0a401cb877e72b6dc06f0cab",
+     "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2",
+     "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0"}
+
+original_docker_file_hashes_docker_1_12 = \
+    {"/etc/sysconfig/docker": "86ed0dbf5b7c53d827c29f9de703000b720bd23cad06460aa68410c646f61a92",
+     "/etc/sysconfig/docker-storage": "709dca62ac8150aa280fdb4d49d122d78a6a2f4f46ff3f04fe8d698b7035f3a0",
+     "/etc/sysconfig/docker-storage-setup": "bf3e1056e8df0dd4fc170a89ac2358f872a17509efa70a3bc56733a488a1e4b2"}
 
 forward_lookup_dict = {}
 reverse_lookup_dict = {}
@@ -54,20 +66,32 @@ package_updates_available_dict = {}
 subscription_dict = {}
 ose_package_installed_dict = {}
 ose_package_not_installed_dict = {}
+etcd_partition_dict = {}
 ssh_connection = HandleSSHConnections()
 selinux_dict = {}
 if options.openshift_version:
     if "3.2" in options.openshift_version:
         openshift_server_repo = "rhel-7-server-ose-3.2-rpms"
+        default_docker_hashes = original_docker_file_hashes_docker_1_8
     elif "3.1" in options.openshift_version:
         openshift_server_repo = "rhel-7-server-ose-3.1-rpms"
+        default_docker_hashes = original_docker_file_hashes_docker_1_8
     elif "3.3" in options.openshift_version:
         openshift_server_repo ="rhel-7-server-ose-3.3-rpms"
+        default_docker_hashes = original_docker_file_hashes_docker_1_10
+    elif "3.4" in options.openshift_version:
+        openshift_server_repo ="rhel-7-server-ose-3.4-rpms"
+        default_docker_hashes = original_docker_file_hashes_docker_1_12
 else:
     openshift_server_repo = "rhel-7-server-ose-3.3-rpms"
 ose_repos = ["rhel-7-server-rpms", "rhel-7-server-extras-rpms", openshift_server_repo]
 ose_required_packages_list = ["wget", "git", "net-tools", "bind-utils", "iptables-services", "bridge-utils",
                               "bash-completion", "atomic-openshift-utils", "docker"]
+
+# We only want to evaluate the default docker file if we are using a private regristry.
+# The file is assumed to be modified by hand only if we are using a private registry.
+if not options.private_registry:
+    default_docker_hashes.pop("/etc/sysconfig/docker")
 
 
 def is_selinux_enabled(host, ssh_obj, dict_to_modify):
@@ -313,6 +337,11 @@ def update_required_query(server_name, package_update_dict, package_list, ssh_ob
          DictionaryHandling.add_to_dictionary(package_update_dict, server_name, "System is up to date",
                                               system_up_to_date)
 
+def parse_etcd(server_name, output, dict_to_modify):
+    if output is not None:
+        output = output[0].split("\n")[0]
+        DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, "ETCD partition", output)
+
 if __name__ == "__main__":
     if options.ansible_host_file is None:
         print("No Ansible host file provided. This is required")
@@ -338,12 +367,15 @@ if __name__ == "__main__":
         if can_connect_to_server:
             ssh_connection.open_ssh(server, ansible_ssh_user)
             check_docker_files(server, ssh_connection, docker_files_have_been_modified_dict,
-                               original_docker_file_hashes_OCP_31, remote_docker_file_sums_dict)
+                               default_docker_hashes, remote_docker_file_sums_dict)
+            print(textColors.HEADER + "Checking to see if /var/lib/etcd is a partition..." + textColors.ENDC)
+            etcd_partition_output = HandleSSHConnections.run_remote_commands(ssh_connection,
+                                                                      '/usr/bin/python -c \"import os; print os.path.ismount(\'/var/lib/etcd\')\"')
+            parse_etcd(server, etcd_partition_output, etcd_partition_dict)
             print(textColors.HEADER + "Running 'yum list installed' on %s..." % server + textColors.ENDC)
             installed_package_query(server, repo_dict, ose_required_packages_list, ssh_connection)
             print(textColors.HEADER + "Running 'yum list updates' on %s..." % server + textColors.ENDC)
             update_required_query(server, package_updates_available_dict, ose_required_packages_list, ssh_connection)
-
             print(textColors.HEADER + "Running 'sestatus' on %s" % server + textColors.ENDC)
             is_selinux_enabled(server, ssh_connection, selinux_dict)
             print(textColors.HEADER + "Running 'systemctl status docker' on %s..." % server + textColors.ENDC)
@@ -379,3 +411,5 @@ if __name__ == "__main__":
     print(textColors.HEADER + textColors.BOLD + "\n\nPackages and repo information" + textColors.ENDC)
     DictionaryHandling.format_dictionary_output(repo_dict, subscription_dict, ose_package_not_installed_dict,
                                                 ose_package_installed_dict, package_updates_available_dict)
+    print(textColors.HEADER + textColors.BOLD + "\n\nETCD has its own partition" + textColors.ENDC)
+    DictionaryHandling.format_dictionary_output(etcd_partition_dict)

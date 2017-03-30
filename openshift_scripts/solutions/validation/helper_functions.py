@@ -72,7 +72,7 @@ class DictionaryHandling:
                 previous_heading = server_name
                 # All dictionaries should have either True or False in order to be colourized
                 # True will be coloured Green, False will be Red. Anything else will be highlighted
-                if "False" in value or "None" in value:
+                if "False" in value and not "ETCD" in heading or "None" in value :
                     print(textColors.FAIL),
                 elif "docker" in heading.lower():
                     if "True" in value:
@@ -84,6 +84,8 @@ class DictionaryHandling:
                 # If the file has been modified mark it yellow as we cannot know whether it is correctly
                 # modified or not
                 elif "sum" in heading:
+                    print(textColors.WARNING),
+                elif "ETCD" in heading:
                     print(textColors.WARNING),
                 elif "available" in heading:
                     print(textColors.WARNING),
