@@ -33,8 +33,10 @@ if not options.project_name:
     time.sleep(1)
     parser.print_help()
     sys.exit()
-  
+
+# Because the project has different metadata than the other objects we are not including them in the export list  
 ose_resources_to_export_list = []
+
 for opt, value in options.__dict__.items():
     if value == True:
         ose_resources_to_export_list.append(opt)
@@ -51,14 +53,18 @@ persistent_volume_list = []
 script_run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M")
 
 metadata_to_remove_list = ["creationTimestamp", "finalizers", "resourceVersion", "selfLink", "uid", "generation"]
-# ose_resources_to_export_list = ["deploymentconfig", "persistentvolume", "persistentvolumeclaim"]
 ###### End variable declaration
 
 
 def get_oc_json_object(ocp_object, specific_resource_name=None):
     """This method should take an argument and return the json form"""
+    # If you give a specific resource name, the export command requires an extra argument
     if specific_resource_name:
-        json_object = json.loads(os.popen("oc get %s %s -o json --export" % (ocp_object, specific_resource_name)).read())
+        # unlike other objects, --export is not available for projects
+        if ocp_object == "project":
+            json_object = json.loads(os.popen("oc get %s %s -o json" % (ocp_object, specific_resource_name)).read())
+        else:
+            json_object = json.loads(os.popen("oc get %s %s -o json --export" % (ocp_object, specific_resource_name)).read())
     else:
         json_object = json.loads(os.popen("oc get %s -o json --export" % (ocp_object)).read())
     return(json_object)
@@ -71,6 +77,14 @@ if os.path.exists(template_output):
 # Change to the correct project before attempting to export the resources
 os.popen("/usr/bin/oc project %s" % options.project_name).read()
 
+project_json_object = get_oc_json_object('project', specific_resource_name=options.project_name)
+
+for metadata in metadata_to_remove_list:
+    # In the event that the metadata does not exist, we don't want to know so burry the error
+    try:
+        project_json_object['metadata'].pop(metadata)
+    except:
+        pass
 
 # build the initial json object list so that we can purge parts we dont want
 for resource in ose_resources_to_export_list:
