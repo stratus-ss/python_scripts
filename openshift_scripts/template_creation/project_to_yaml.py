@@ -64,6 +64,18 @@ metadata_to_remove_list = ["creationTimestamp", "finalizers", "resourceVersion",
 ###### End variable declaration
 
 
+def remove_attribute_from_object(resource_name, section_heading, entry_to_remove, extra_section=None):
+    """This method pops objects out of a dictionary in a try/except block 
+    but swallows the errors because we don't care if we try to pop an object 
+    that doesn't exist"""
+    try:
+        if extra_section:
+            resource_name[section_heading][extra_section].pop(entry_to_remove)
+        else:
+            resource_name[section_heading].pop(entry_to_remove)
+    except:
+        pass
+
 def get_oc_json_object(ocp_object, specific_resource_name=None):
     """This method should take an argument and return the json form"""
     # If you give a specific resource name, the export command requires an extra argument
@@ -90,11 +102,7 @@ project_json_object = get_oc_json_object('project', specific_resource_name=optio
 project_json_object.pop('status')
 project_json_object['spec'].pop('finalizers')
 for metadata in metadata_to_remove_list:
-    # In the event that the metadata does not exist, we don't want to know so burry the error
-    try:
-        project_json_object['metadata'].pop(metadata)
-    except:
-        pass
+    remove_attribute_from_object(resource_name=project_json_object, section_heading='metadata', entry_to_remove=metadata)
 
 # build the initial json object list so that we can purge parts we dont want
 for resource in ose_resources_to_export_list:
@@ -109,35 +117,27 @@ for resource in ose_resources_to_export_list:
             if resource == "persistentvolumeclaim":
                 volume_name = individual_entry['spec']['volumeName']
                 persistent_volume_list.append(volume_name)
-             # In the event that the spec does not exist, we don't want to know so burry the error
-            try:
-                individual_entry['spec'].pop('revisionHistoryLimit')
-            except:
-                pass
+                
+            remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='revisionHistoryLimit')
+            remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='clusterIP')
+            remove_attribute_from_object(resource_name=individual_entry, section_heading='metadata', extra_section='annotations', entry_to_remove='pv.kubernetes.io/bind-completed')
             for metadata in metadata_to_remove_list:
-                try:
-                    individual_entry['metadata'].pop(metadata)
-                except:
-                    pass
+                remove_attribute_from_object(individual_entry, 'metadata', metadata)
         json_object_list.append(temp_holder)
 
 if options.persistentvolume:
     for volume in persistent_volume_list:
         temp_holder = get_oc_json_object("persistentvolume", specific_resource_name=volume)
         temp_holder.pop('status')
-         # In the event that the spec does not exist, we don't want to know so burry the error
-        try:
-            temp_holder['spec']['claimRef'].pop('resourceVersion')
-            temp_holder['spec']['claimRef'].pop('uid')
-        except:
-            pass
+        #remove_attribute_from_object(temp_holder, 'spec', 'resourceVersion')
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='spec', extra_section='claimRef', entry_to_remove='apiVersion')
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='spec', extra_section='claimRef', entry_to_remove='kind')
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='spec', extra_section='claimRef', entry_to_remove='resourceVersion')
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='spec', extra_section='claimRef', entry_to_remove='uid')
         for metadata in metadata_to_remove_list:
-            try:
-                temp_holder['metadata'].pop(metadata)
-            except:
-                pass
-        
+            remove_attribute_from_object(temp_holder, 'metadata', metadata)
         json_object_list.append(temp_holder)
+
 
 sys.stdout = open(template_output, 'a')
 print(yaml.safe_dump(project_json_object))
