@@ -29,7 +29,7 @@ parser.add_option('--persistentvolume', '-v',  dest = 'persistentvolume', help="
 parser.add_option('--persistentvolumeclaim', '-c',  dest = 'persistentvolumeclaim', help="Include PersistentVolumeClaim in the export", action='store_true')
 parser.add_option('--configmap', '-m',  dest = 'configmap', help="Include ConfigMap in the export", action='store_true')
 parser.add_option('--output-directory', '-o', dest="output_directory", help="The directory to output the template to")
-
+parser.add_option('--aws', dest='aws', help="If running in AWS remove the volumeName from PVC", action='store_true')
 (options, args) = parser.parse_args()
 
 if not options.project_name:
@@ -42,8 +42,12 @@ if not options.project_name:
 ose_resources_to_export_list = []
 
 for opt, value in options.__dict__.items():
-    if value == True:
-        ose_resources_to_export_list.append(opt)
+    # The aws option is not an option option so don't store it in the OSE list
+    if opt == "aws":
+        pass
+    else:
+        if value == True:
+            ose_resources_to_export_list.append(opt)
 
 # Store the sys.stdout so that it is easy to restore later
 old_stdout = sys.stdout
@@ -64,13 +68,15 @@ metadata_to_remove_list = ["creationTimestamp", "finalizers", "resourceVersion",
 ###### End variable declaration
 
 
-def remove_attribute_from_object(resource_name, section_heading, entry_to_remove, extra_section=None):
+def remove_attribute_from_object(resource_name, entry_to_remove, section_heading=None, extra_section=None, top_level_heading=False):
     """This method pops objects out of a dictionary in a try/except block 
     but swallows the errors because we don't care if we try to pop an object 
     that doesn't exist"""
     try:
         if extra_section:
             resource_name[section_heading][extra_section].pop(entry_to_remove)
+        elif top_level_heading:
+            resource_name.pop(entry_to_remove)
         else:
             resource_name[section_heading].pop(entry_to_remove)
     except:
@@ -111,18 +117,24 @@ for resource in ose_resources_to_export_list:
     else:
         temp_holder = get_oc_json_object(resource)  
         # get rid of the status information as it is not needed
-        remove_attribute_from_object(resource_name=temp_holder, section_heading='items', entry_to_remove='status')    
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='items', entry_to_remove='status') 
+
         for individual_entry in temp_holder["items"]:
             # We want to extract the volume name from the claim in order to back it up
             if resource == "persistentvolumeclaim":
                 volume_name = individual_entry['spec']['volumeName']
                 persistent_volume_list.append(volume_name)
+                remove_attribute_from_object(resource_name=individual_entry, entry_to_remove='status', top_level_heading=True)
+                if options.aws:
+                    remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='volumeName')
                 
             remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='revisionHistoryLimit')
             remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='clusterIP')
             remove_attribute_from_object(resource_name=individual_entry, section_heading='metadata', extra_section='annotations', entry_to_remove='pv.kubernetes.io/bind-completed')
+            remove_attribute_from_object(resource_name=individual_entry, section_heading='metadata', extra_section='annotations', entry_to_remove='pv.kubernetes.io/bound-by-controller')
+
             for metadata in metadata_to_remove_list:
-                remove_attribute_from_object(individual_entry, 'metadata', metadata)
+                remove_attribute_from_object(resource_name=individual_entry, section_heading='metadata', entry_to_remove=metadata)
         json_object_list.append(temp_holder)
 
 if options.persistentvolume:
