@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
 # Owner: Steve Ovens <steve D0T ovens <AT> redhat -DOT- com>
-# Date Created: May 2016
-# Modified: June 1, 2016
-# Primary Function:
+# Date Created: July 2019
+# Primary Function: This script takes a project as its required argument and then any of ImageStream, 
+# DeploymentConfig BuildConfig, Service, Route, PersistentVolume, PersistentVolumeClaim, or ConfigMap
+# and sanitize the export of these options. There is a lot of unneeded or unwanted metadata that 
+# is removed by this script. The output is a yaml file that contains all the definitions required to 
+# recreate your project from scratch (by using oc create -f /tmp/<template name>)
 
 
 import os
@@ -25,6 +28,7 @@ parser.add_option('--route', '-r',  dest = 'route', help="Include Route in the e
 parser.add_option('--persistentvolume', '-v',  dest = 'persistentvolume', help="Include PersistentVolume in the export", action='store_true')
 parser.add_option('--persistentvolumeclaim', '-c',  dest = 'persistentvolumeclaim', help="Include PersistentVolumeClaim in the export", action='store_true')
 parser.add_option('--configmap', '-m',  dest = 'configmap', help="Include ConfigMap in the export", action='store_true')
+parser.add_option('--output-directory', '-o', dest="output_directory", help="The directory to output the template to")
 
 (options, args) = parser.parse_args()
 
@@ -41,11 +45,15 @@ for opt, value in options.__dict__.items():
     if value == True:
         ose_resources_to_export_list.append(opt)
 
-
 # Store the sys.stdout so that it is easy to restore later
 old_stdout = sys.stdout
 
-template_output_path = "/tmp/"
+# Allow for the override of the output directory
+if options.output_directory:
+    template_output_path = options.output_directory
+else:
+    template_output_path = "/tmp/"
+
 template_name = template_output_path + options.project_name + "_template_temp"
 template_output = template_output_path + options.project_name + "_template.yaml" 
 json_object_list = []
@@ -78,7 +86,9 @@ if os.path.exists(template_output):
 os.popen("/usr/bin/oc project %s" % options.project_name).read()
 
 project_json_object = get_oc_json_object('project', specific_resource_name=options.project_name)
-
+# get rid of excess data that just clutters the entries
+project_json_object.pop('status')
+project_json_object['spec'].pop('finalizers')
 for metadata in metadata_to_remove_list:
     # In the event that the metadata does not exist, we don't want to know so burry the error
     try:
@@ -99,6 +109,7 @@ for resource in ose_resources_to_export_list:
             if resource == "persistentvolumeclaim":
                 volume_name = individual_entry['spec']['volumeName']
                 persistent_volume_list.append(volume_name)
+             # In the event that the spec does not exist, we don't want to know so burry the error
             try:
                 individual_entry['spec'].pop('revisionHistoryLimit')
             except:
@@ -114,8 +125,12 @@ if options.persistentvolume:
     for volume in persistent_volume_list:
         temp_holder = get_oc_json_object("persistentvolume", specific_resource_name=volume)
         temp_holder.pop('status')
-        temp_holder['spec']['claimRef'].pop('resourceVersion')
-        temp_holder['spec']['claimRef'].pop('uid')
+         # In the event that the spec does not exist, we don't want to know so burry the error
+        try:
+            temp_holder['spec']['claimRef'].pop('resourceVersion')
+            temp_holder['spec']['claimRef'].pop('uid')
+        except:
+            pass
         for metadata in metadata_to_remove_list:
             try:
                 temp_holder['metadata'].pop(metadata)
@@ -124,8 +139,9 @@ if options.persistentvolume:
         
         json_object_list.append(temp_holder)
 
+sys.stdout = open(template_output, 'a')
+print(yaml.safe_dump(project_json_object))
 for item in json_object_list:
-    sys.stdout = open(template_output, 'a')
-    print(yaml.safe_dump(item))
     print('---')
+    print(yaml.safe_dump(item))
 
