@@ -109,10 +109,10 @@ for resource in ose_resources_to_export_list:
     if resource == "persistentvolume":
         pass
     else:
-        temp_holder = get_oc_json_object(resource)      
+        temp_holder = get_oc_json_object(resource)  
+        # get rid of the status information as it is not needed
+        remove_attribute_from_object(resource_name=temp_holder, section_heading='items', entry_to_remove='status')    
         for individual_entry in temp_holder["items"]:
-            # get rid of the status information as it is not needed
-            individual_entry.pop("status")
             # We want to extract the volume name from the claim in order to back it up
             if resource == "persistentvolumeclaim":
                 volume_name = individual_entry['spec']['volumeName']
