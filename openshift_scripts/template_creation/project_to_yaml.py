@@ -27,11 +27,16 @@ parser.add_option('--configmap', '-m',  dest = 'configmap', help="Include Config
 
 (options, args) = parser.parse_args()
 
-
+if not options.project_name:
+    print("\nProject name is required\n")
+    time.sleep(1)
+    parser.print_help()
+    sys.exit()
+  
 ose_resources_to_export_list = []
 for opt, value in options.__dict__.items():
-  if value == True:
-      ose_resources_to_export_list.append(opt)
+    if value == True:
+        ose_resources_to_export_list.append(opt)
 
 
 # Store the sys.stdout so that it is easy to restore later
