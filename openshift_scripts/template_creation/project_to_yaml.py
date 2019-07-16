@@ -28,6 +28,7 @@ parser.add_option('--route', '-r',  dest = 'route', help="Include Route in the e
 parser.add_option('--persistentvolume', '-v',  dest = 'persistentvolume', help="Include PersistentVolume in the export", action='store_true')
 parser.add_option('--persistentvolumeclaim', '-c',  dest = 'persistentvolumeclaim', help="Include PersistentVolumeClaim in the export", action='store_true')
 parser.add_option('--configmap', '-m',  dest = 'configmap', help="Include ConfigMap in the export", action='store_true')
+parser.add_option('--secret', '-x', dest = 'secret', help="Include Secrets in the export", action='store_true')
 parser.add_option('--output-directory', '-o', dest="output_directory", help="The directory to output the template to")
 parser.add_option('--aws', dest='aws', help="If running in AWS remove the volumeName from PVC", action='store_true')
 (options, args) = parser.parse_args()
@@ -89,6 +90,8 @@ def get_oc_json_object(ocp_object, specific_resource_name=None):
         # unlike other objects, --export is not available for projects
         if ocp_object == "project":
             json_object = json.loads(os.popen("oc get %s %s -o json" % (ocp_object, specific_resource_name)).read())
+        elif ocp_object == "secret":
+            json_object = json.loads(os.popen("oc get %s %s -o json" % (ocp_object, specific_resource_name)).read()) 
         else:
             json_object = json.loads(os.popen("oc get %s %s -o json --export" % (ocp_object, specific_resource_name)).read())
     else:
