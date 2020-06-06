@@ -66,10 +66,9 @@ def find_classification_type(file_to_parse):
     list_of_classifications = []
     try:
         for line in open(file_to_parse).readlines():
-            if "or =>" in line:
-                if not "#" in line:
-                    classification_type = line.split(" or")[0].strip().replace('"', '')
-                    list_of_classifications.append(classification_type)
+            if "or =>" in line and "#" not in line:
+                classification_type = line.split(" or")[0].strip().replace('"', '')
+                list_of_classifications.append(classification_type)
     except IOError:
         print("Could not find %s...skipping" % file_to_parse)
     return(list_of_classifications)

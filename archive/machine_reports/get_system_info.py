@@ -26,13 +26,10 @@ class HardwareInformation:
 
     def get_disk_info(self):
         for line in open("/etc/mtab").readlines():
-            if line.startswith("/dev"):
-                if "boot" in line:
-                    pass
-                else:
-                    partition = line.split()[1]
-                    append_partition = self.disk_usage(partition)
-                    self.list_of_all_system_disks.append(append_partition)
+            if line.startswith("/dev") and "boot" not in line:
+                partition = line.split()[1]
+                append_partition = self.disk_usage(partition)
+                self.list_of_all_system_disks.append(append_partition)
         # This if statement is used to make sure that the proper partition goes under the correct
         # heading in the csv file. At the time of writing I am expecting '/, /DATA, /usr/local'
         if not [value for value in self.list_of_all_system_disks if "DATA" in value.upper()]:
@@ -132,6 +129,5 @@ class LinuxInformation:
             # By convention each autodata repo file has a gpgcheck section, so stop reading the file there
             if line.strip().startswith("gpgcheck"):
                 start = False
-            if start:
-                if "baseurl" in line:
-                    self.yum_repository = line.split("centos/")[-1].split("/$releasever/")[0]
+            if start and "baseurl" in line:
+                self.yum_repository = line.split("centos/")[-1].split("/$releasever/")[0]

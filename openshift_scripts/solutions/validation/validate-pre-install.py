@@ -169,7 +169,6 @@ def check_forward_dns_lookup(host_name, dict_to_modify):
         try:
             socket.inet_aton(host_name)
             print("You should be using FQDN instead of IPs in your ansible host file!")
-            pass
         except socket.error:
             pass
         DictionaryHandling.add_to_dictionary(dict_to_modify, host_name, "IP Address", None)
@@ -203,14 +202,9 @@ def check_docker_files(host, ssh_obj, files_modified_dict, dict_to_compare, remo
             shortened_file_name = files.split("/")[-1]
             for line in temp_list:
                 sha_sum = line.split()[0]
-                if line.strip().split()[0] == dict_to_compare[files]:
-                    modified = False
-                    DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
-                                                         shortened_file_name, modified)
-                else:
-                    modified = True
-                    DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
-                                                         shortened_file_name, modified)
+                modified = False if line.strip().split()[0] == dict_to_compare[files] else True
+                DictionaryHandling.add_to_dictionary(files_modified_dict, host, "%s has been modified" %
+                                                     shortened_file_name, modified)
                 # Added the file name and sha sum in the key to be able to associate the sum to modified flag
                 # This will help to identify it for colourization
                 DictionaryHandling.add_to_dictionary(remote_docker_file_sums_dict, host, "%s sha256sum : %s" %
@@ -283,10 +277,7 @@ def which_repos_are_enabled(server_name, dict_to_modify, repo_info, these_should
         if repo_id_keyword in line:
             repo_name = line.split(repo_id_keyword)[1].strip()
         if repo_enabled_keyword in line:
-            if "1" in line.split(repo_enabled_keyword)[1]:
-                enabled = True
-            else:
-                enabled = False
+            enabled = True if "1" in line.split(repo_enabled_keyword)[1] else False
             if repo_name in these_should_be_enabled:
                 DictionaryHandling.add_to_dictionary(dict_to_modify, server_name, repo_name, enabled)
 

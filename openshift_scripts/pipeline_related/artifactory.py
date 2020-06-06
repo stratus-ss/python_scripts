@@ -46,8 +46,7 @@ class ArtifactoryApi():
                         # associate a component with a specific blueprint
                         common.append_to_single_dimension_dict(latest_version_dict, component_name, environment)
         # Go through the dictionary and redefine each component with the latest blueprint version
-        for key in latest_version_dict.keys():
-            latest_version = max(latest_version_dict[key])
+        for key, latest_version in latest_version_dict.items():
             latest_version_dict[key] = latest_version
         return(latest_version_dict)
 
@@ -230,11 +229,11 @@ class ArtifactoryApi():
                 pass  # nothing to do, blueprint already retrieved
 
         # check for errors
-        if len(missing_blueprints) > 0:
+        if missing_blueprints:
             raise FileNotFoundException("Following blueprints not found (dml repositories: %s):\n%s"
                                          % (','.join(self.dml_repositories), json.dumps(missing_blueprints, indent=4)))
 
-        if len(invalid_json_blueprints) > 0:
+        if invalid_json_blueprints:
             raise InvalidJsonSyntaxException("Following blueprints contain invalid json (dml repositories: %s):\n%s"
                                              % (','.join(self.dml_repositories), json.dumps(invalid_json_blueprints, indent=4)))
 

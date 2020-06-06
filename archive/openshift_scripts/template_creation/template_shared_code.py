@@ -241,11 +241,11 @@ class TemplateParsing:
          'default' and 'builder' service accounts as required by OSE"""
 
         change_to_project = os.popen("oc project %s 2> /dev/null" % destination_project).read()
-        git_secret_name = "gitauth"
-        docker_secret_name = "dockerconfig"
         if not change_to_project:
             os.popen("oc new-project %s" % destination_project)
         if args:
+            git_secret_name = "gitauth"
+            docker_secret_name = "dockerconfig"
             for credentials_file in args[0]:
                 path_to_file = credentials_file.split("=")[1]
                 if "git" in credentials_file:
@@ -270,18 +270,17 @@ class TemplateParsing:
         username_split_keyword = "USERNAME"
         password_split_keyword = "PASSWORD"
         for line in open(path_to_file).readlines():
-            if line.strip():
-                if not line.startswith("#"):
-                    if line.upper().startswith(username_split_keyword):
-                        if line.upper().split(username_split_keyword)[1].startswith("="):
-                            username = line.split("=")[1].strip()
-                        if line.upper().split(username_split_keyword)[1].startswith(":"):
-                            username = line.split(":")[1].strip()
-                    if line.upper().startswith(password_split_keyword):
-                        if line.upper().split(password_split_keyword)[1].startswith("="):
-                            password = line.split("=")[1].strip()
-                        if line.upper().split(password_split_keyword)[1].startswith(":"):
-                            password = line.split(":")[1].strip()
+            if line.strip() and not line.startswith("#"):
+                if line.upper().startswith(username_split_keyword):
+                    if line.upper().split(username_split_keyword)[1].startswith("="):
+                        username = line.split("=")[1].strip()
+                    if line.upper().split(username_split_keyword)[1].startswith(":"):
+                        username = line.split(":")[1].strip()
+                if line.upper().startswith(password_split_keyword):
+                    if line.upper().split(password_split_keyword)[1].startswith("="):
+                        password = line.split("=")[1].strip()
+                    if line.upper().split(password_split_keyword)[1].startswith(":"):
+                        password = line.split(":")[1].strip()
         return(username, password)
 
 

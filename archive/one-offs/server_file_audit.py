@@ -122,13 +122,12 @@ def process_parameter_file(parameter_file):
     global number_of_groups
     for line in open(parameter_file).readlines():
         #Ignore blank spaces, this will only process lines with which have text
-        if line.strip():
-            if not line.startswith("#"):
-                #value is the generic variable for anything after the '=' sign
-                value = line.split("=")[1].strip()
+        if line.strip() and not line.startswith("#"):
+            #value is the generic variable for anything after the '=' sign
+            value = line.split("=")[1].strip()
         if line.startswith("SERVER_GROUP"):
             group_name = 'Group' + line.split('=')[0].strip().split("SERVER_GROUP")[1]
-            SERVER_LIST[value] = group_name 
+            SERVER_LIST[value] = group_name
         if line.startswith("GROUP"):
             number_of_groups = line.split('=')[0].strip().split("GROUP")[1].split("_FILES")[0]
             group_file_name = 'Group' + number_of_groups

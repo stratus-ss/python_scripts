@@ -90,9 +90,8 @@ class ParseDeploymentParameters:
         self.INCOMING_CONFIG_FILE = config_file
         for line in open(self.INCOMING_CONFIG_FILE).readlines():
             #Ignore blank spaces, this will only process lines with which have text
-            if line.strip():
-                if not line.startswith("#"):
-                    value = line.split("=")[1].strip()
+            if line.strip() and not line.startswith("#"):
+                value = line.split("=")[1].strip()
             if line.startswith("PATH_TO_WARFILE"):
                 self.WARFILE_PATH = value
             elif line.startswith("OLD_WARFILE_PATH"):
@@ -293,18 +292,21 @@ class curlWarfile:
                 warfile_parameters.TOMCAT_RESTART_SCRIPT)))
                 SSH = sshConnections()
                 SSH.try_ssh(EACH_SERVER, warfile_parameters.SSH_USER)
-                counter = 0
                 #Loop through all of the files in the remote webapps directory
-                while counter < len(deployment.predeployed_warfile_hashes):
-                    stdin, stdout, stderr = SSH.open_ssh.ssh.exec_command("md5sum %s/webapps/%s" %
-                    (warfile_parameters.TOMCAT_DIRECTORY,
-                    deployment.predeployed_warfile_hashes[counter].split("/")[-1]))
+                for predeployed_warfile_hash in deployment.predeployed_warfile_hashes:
+                    stdin, stdout, stderr = SSH.open_ssh.ssh.exec_command(
+                        "md5sum %s/webapps/%s"
+                        % (
+                            warfile_parameters.TOMCAT_DIRECTORY,
+                            predeployed_warfile_hash.split("/")[-1],
+                        )
+                    )
+
                     md5_output = stdout.readlines()
                     #The md5 output is returned as a tupple, so I am converting it to a string before adding
                     #to the list
                     addme = "".join(md5_output) + "\n"
                     deployed_war_hashes.append(addme.rstrip())
-                    counter += 1
                 #I am inserting the the server name in front of each set of warfile hashes
                 deployed_war_hashes.insert((len(deployed_war_hashes) - len(deployment.predeployed_warfile_hashes)),
                      (EACH_SERVER + ": "))

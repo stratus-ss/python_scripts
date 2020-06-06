@@ -85,17 +85,14 @@ def process_ssh_output(output):
         if ": " in ssh_lines:
             ssh_line_value = ssh_lines.split(": ")[1].replace(",", "")
         if '"Running":' in ssh_lines:
-            if "true" in ssh_line_value:
-                container_running = True
-            else:
-                container_running = False
+            container_running = True if "true" in ssh_line_value else False
         if '"StartedAt":' in ssh_lines:
             container_start_at_time = ssh_line_value
         if '"OOMKilled":' in ssh_lines:
             oomkilled = ssh_line_value
         if '"ExposedPorts": {' in ssh_lines:
             exposed_ports_start = True
-        elif '},' in ssh_lines and not '{' in ssh_lines:
+        elif '},' in ssh_lines and '{' not in ssh_lines:
             exposed_ports_start = False
         elif exposed_ports_start:
             list_of_ports.append(ssh_lines.split(":")[0].strip())
@@ -121,9 +118,8 @@ def format_output(text_to_print):
         if "Image ID" in line_second_pass:
             colour = textColors.OKBLUE
             indent = False
-        if "Container restarts" in line_second_pass:
-            if value != 0:
-                colour = textColors.WARNING
+        if "Container restarts" in line_second_pass and value != 0:
+            colour = textColors.WARNING
         if "Container running" in line_second_pass:
             if value:
                 colour = textColors.OKGREEN

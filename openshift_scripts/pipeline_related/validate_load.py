@@ -46,7 +46,6 @@ def process_pod_json(command, status_dict, version_dict, component_label, incomi
                         container_dict[container_name] = docker_image_name
             except KeyError:
                 log.debug("%s has a state of %s" % (component['metadata']['name'], component['status']['phase']))
-                pass
             # The api can report that a pod is {ready: True} even if a container is down
             # Therefore, flag the pod as not ready
             if container_failed:
@@ -144,7 +143,6 @@ def inspect_load_state(component_to_inspect, gateway_session, pod_status_dict, d
                         log.warning("%sNo deployer pods found to clean up for: %s" % (textColours.FAIL, second_key))
                     except KeyError:
                         print("key error")
-                        pass
                 deployer_and_component = component_to_inspect + " : " + deployer_name
                 if deployer_and_component is not None:
                     write_file = open(filename, "a")
