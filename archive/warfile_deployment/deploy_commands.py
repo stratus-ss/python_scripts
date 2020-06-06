@@ -51,15 +51,15 @@ class CurlWarfile:
                                                            deployment_arguments['tomcat_port']))
         did_deployment_fail = self.check_curl_success(deployment_arguments['server_name'],
                                                       deployment_arguments['command'])
-        retry_count = 0
         if did_deployment_fail:
+            retry_count = 0
             while did_deployment_fail:
                 print("Curl Deployment failed, retrying in 5 seconds. This is attempt number %s" % (retry_count + 1))
                 time.sleep(5)
-                did_deploy_fail = self.check_curl_success(deployment_arguments['server_name'],
-                                                          deployment_arguments['command'])
                 retry_count += 1
                 if retry_count > 2:
+                    did_deploy_fail = self.check_curl_success(deployment_arguments['server_name'],
+                                                              deployment_arguments['command'])
                     print("I was unable to reach %s. Deployment failed" % deployment_arguments['server_name'])
                     return(True)
 

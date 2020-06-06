@@ -270,9 +270,7 @@ class SFTPClient(paramiko.SFTPClient):
         try:
             super(SFTPClient, self).mkdir(path, mode)
         except IOError:
-            if ignore_existing:
-                pass
-            else:
+            if not ignore_existing:
                 raise
 
 if __name__ == "__main__":

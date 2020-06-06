@@ -15,9 +15,8 @@ class ParseDeploymentParameters:
         self.incoming_config_file = config_file
         for line in open(self.incoming_config_file).readlines():
             # Ignore blank spaces, this will only process lines with which have text
-            if line.strip():
-                if not line.startswith("#"):
-                    value = line.split("=")[1].strip()
+            if line.strip() and not line.startswith("#"):
+                value = line.split("=")[1].strip()
             if line.startswith("PATH_TO_WARFILE"):
                 self.warfile_path = value
             elif line.startswith("OLD_WARFILE_PATH"):

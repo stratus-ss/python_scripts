@@ -39,9 +39,7 @@ if __name__ == "__main__":
     gateway_session = ssh.SSHSession(gateway_ip, user)
 
     for deployer_pod_line in open(cleanup_file).readlines():
-        if "deploy" not in deployer_pod_line.split("-")[-1]:
-            pass
-        else:
+        if "deploy" in deployer_pod_line.split("-")[-1]:
             component_name = deployer_pod_line.split(" : ")[0]
             deployer_pod_name = deployer_pod_line.split(" : ")[1]
             os_master_session = openshift.cluster.get_master_session(gateway_session, component_name)

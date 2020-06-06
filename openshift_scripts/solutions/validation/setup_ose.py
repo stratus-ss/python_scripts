@@ -96,14 +96,11 @@ copy_docker_storage_file = ""
 
 
 def add_to_list(list_name, number_of_hosts, question):
-    counter = 0
-    while counter < int(number_of_hosts):
+    for counter in range(int(number_of_hosts)):
         list_name.append(raw_input("Please enter the fqdn of " + question + str(counter + 1) + ": "))
-        counter += 1
 
 
 def add_to_dictionary(dictionary_name, number_of_hosts, question):
-    counter = 0
     determine_current_default_region = question.split()[0]
     if "infrastructure" in determine_current_default_region:
         current_region = "Infra"
@@ -114,19 +111,18 @@ def add_to_dictionary(dictionary_name, number_of_hosts, question):
     if "yes" in change_default_region:
         current_region = raw_input("Please enter a region name: ")
     add_zone = validate_yes_no_answer("Do you want to add zones for your nodes (yes/no)? ")
-    while counter < int(number_of_hosts):
+    for counter in range(int(number_of_hosts)):
         dictionary_key = raw_input("Please enter the fqdn of " + question + str(counter + 1) + ": ")
         if "yes" in add_zone:
             current_zone = raw_input("Please enter the zone this host is located in: ")
             dictionary_name[dictionary_key] = {'region': current_region, 'zone': current_zone}
         else:
             dictionary_name[dictionary_key] = {'region': current_region}
-        counter +=1
 
 
 def validate_yes_no_answer(question_to_re_ask):
     answer = raw_input(question_to_re_ask).lower()
-    while answer != "yes" and answer != "no":
+    while answer not in ["yes", "no"]:
         print("\nPlease enter yes or no")
         answer = raw_input(question_to_re_ask)
     return answer

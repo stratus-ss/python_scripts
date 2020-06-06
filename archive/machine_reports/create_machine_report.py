@@ -24,10 +24,7 @@ python_version = sys.version.split()[0]
 # the "any()" method was introduced in python 2.5. I am going to create it in the case of python 2.4
 if "2.4" in python_version:
     def any(iterable):
-        for element in iterable:
-            if element:
-                return True
-        return False
+        return any(iterable)
 
 hostname = socket.gethostname().lower()
 environment = hostname.split("-")[1]
@@ -60,8 +57,9 @@ def print_statement():
         mysql_version = ""
         mongo_version = ""
 
-        if not any(postfix in hostname for postfix in mysql_server_postfixes) or not \
-                   any(postfix in hostname for postfix in mongo_server_postfixes):
+        if all(
+            postfix not in hostname for postfix in mysql_server_postfixes
+        ) or all(postfix not in hostname for postfix in mongo_server_postfixes):
             java_versions = JavaVersion()
 
         if any(postfix in hostname for postfix in web_server_postfixes) or \

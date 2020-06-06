@@ -58,9 +58,10 @@ class GenericServerType(object):
                     # so look for case-insensitive
                     if line.lower().startswith("version") or line.startswith("Implementation-Version"):
                         component_with_path_removed = autodata_component.split("/")[-1] + ": \t" + line.split()[1]
-                        if component_with_path_removed in self.found_manifest_version:
-                            pass
-                        else:
+                        if (
+                            component_with_path_removed
+                            not in self.found_manifest_version
+                        ):
                             self.found_manifest_version.append(component_with_path_removed)
 
 
@@ -97,9 +98,7 @@ class JavaVersion:
 
     def get_java_version(self):
         for java_version in FindFiles.find_files(JAVA_BINARY_LOCATION, "java"):
-            if os.path.islink(os.path.basename(java_version)):
-                pass
-            else:
+            if not os.path.islink(os.path.basename(java_version)):
                 if "gcj" in java_version or "gij" in java_version:
                     found_java_version = subprocess.Popen([java_version, '--version'],
                                                           stdout=subprocess.PIPE, stdin=subprocess.PIPE,
@@ -119,8 +118,11 @@ class DatabaseVersionInformation:
     def find_mysql(self):
         mysqld_location = "/usr/sbin/mysqld"
         mysql_command = mysqld_location + " --version"
-        found_mysql_version = ErrorHelper.identify_problem(mysql_command, "MySQL").split()[2].strip(",")
-        return(found_mysql_version)
+        return (
+            ErrorHelper.identify_problem(mysql_command, "MySQL")
+            .split()[2]
+            .strip(",")
+        )
 
     def find_mongodb(self, mongo_server=None):
         mongo_dir = "/usr/local/mongodb/bin"
@@ -130,8 +132,11 @@ class DatabaseVersionInformation:
             mongo_dir = "/usr/local/mongodb"
         mongo_binary = "mongo"
         mongo_command = mongo_dir + os.sep + mongo_binary + " --version"
-        found_mongo_version = ErrorHelper.identify_problem(mongo_command, "MongoDB").split()[3].strip(",")
-        return(found_mongo_version)
+        return (
+            ErrorHelper.identify_problem(mongo_command, "MongoDB")
+            .split()[3]
+            .strip(",")
+        )
 
 
 class WebStackInformation:

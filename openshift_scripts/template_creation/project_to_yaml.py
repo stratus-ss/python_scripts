@@ -44,11 +44,8 @@ ose_resources_to_export_list = []
 
 for opt, value in options.__dict__.items():
     # The aws option is not an option option so don't store it in the OSE list
-    if opt == "aws":
-        pass
-    else:
-        if value == True:
-            ose_resources_to_export_list.append(opt)
+    if opt != "aws" and value == True:
+        ose_resources_to_export_list.append(opt)
 
 # Store the sys.stdout so that it is easy to restore later
 old_stdout = sys.stdout
@@ -60,7 +57,7 @@ else:
     template_output_path = "/tmp/"
 
 template_name = template_output_path + options.project_name + "_template_temp"
-template_output = template_output_path + options.project_name + "_template.yaml" 
+template_output = template_output_path + options.project_name + "_template.yaml"
 json_object_list = []
 persistent_volume_list = []
 script_run_date = datetime.datetime.now().strftime("%Y-%m-%d-%H_%M")
@@ -88,10 +85,8 @@ def get_oc_json_object(ocp_object, specific_resource_name=None):
     # If you give a specific resource name, the export command requires an extra argument
     if specific_resource_name:
         # unlike other objects, --export is not available for projects
-        if ocp_object == "project":
+        if ocp_object in ["project", "secret"]:
             json_object = json.loads(os.popen("oc get %s %s -o json" % (ocp_object, specific_resource_name)).read())
-        elif ocp_object == "secret":
-            json_object = json.loads(os.popen("oc get %s %s -o json" % (ocp_object, specific_resource_name)).read()) 
         else:
             json_object = json.loads(os.popen("oc get %s %s -o json --export" % (ocp_object, specific_resource_name)).read())
     else:
@@ -115,9 +110,7 @@ for metadata in metadata_to_remove_list:
 
 # build the initial json object list so that we can purge parts we dont want
 for resource in ose_resources_to_export_list:
-    if resource == "persistentvolume":
-        pass
-    else:
+    if resource != "persistentvolume":
         temp_holder = get_oc_json_object(resource)  
         # get rid of the status information as it is not needed
         remove_attribute_from_object(resource_name=temp_holder, section_heading='items', entry_to_remove='status') 
@@ -130,7 +123,7 @@ for resource in ose_resources_to_export_list:
                 remove_attribute_from_object(resource_name=individual_entry, entry_to_remove='status', top_level_heading=True)
                 if options.aws:
                     remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='volumeName')
-                
+
             remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='revisionHistoryLimit')
             remove_attribute_from_object(resource_name=individual_entry, section_heading='spec', entry_to_remove='clusterIP')
             remove_attribute_from_object(resource_name=individual_entry, section_heading='metadata', extra_section='annotations', entry_to_remove='pv.kubernetes.io/bind-completed')

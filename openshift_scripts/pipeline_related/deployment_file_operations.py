@@ -106,7 +106,7 @@ def format_string_to_json(previous_component_dict, component_being_deployed_dict
                         json_env_string = '"env_version":{"current":"%s","new":"%s"}}' % (version[1], version[0])
                     else:
                         json_env_string = '"env_version":{"current":"%s","new":"%s"}}' % (version[0], version[0])
-                if key == "component_version":
+                elif key == "component_version":
                     if "component" in json_filename:
                         json_component_string = '"%s":{"version":{"current":"%s","new":"%s"}' % (
                         component, version[1], version[0])
@@ -243,10 +243,13 @@ if __name__ == "__main__":
     update_config(list_of_components, config, options.config_file, previous_component_version_dict,
                   proposed_component_version_dict)
 
-    for key in previous_component_version_dict.keys():
-        if key in proposed_component_version_dict.keys():
-            if previous_component_version_dict[key] == proposed_component_version_dict[key]:
-                log.error("Detected the same versions of %s and %s_env... aborting as there is no change to "
-                          "make\n" % (key, key))
-                sys.exit(1)
+    for key in previous_component_version_dict:
+        if (
+            key in proposed_component_version_dict
+            and previous_component_version_dict[key]
+            == proposed_component_version_dict[key]
+        ):
+            log.error("Detected the same versions of %s and %s_env... aborting as there is no change to "
+                      "make\n" % (key, key))
+            sys.exit(1)
     format_string_to_json(previous_component_version_dict, proposed_component_version_dict, dump_files_here)

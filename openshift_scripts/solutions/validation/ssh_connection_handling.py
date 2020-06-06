@@ -37,5 +37,4 @@ class HandleSSHConnections:
     @staticmethod
     def run_remote_commands(ssh_object, command):
         stdin, stdout, stderr = ssh_object.ssh.exec_command(command)
-        temp_list = stdout.readlines()
-        return(temp_list)
+        return stdout.readlines()
