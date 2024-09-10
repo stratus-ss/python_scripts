@@ -1,3 +1,10 @@
+# IMPORTANT NOTE
+
+Most of the upstream work is now happening on https://github.com/rhtools/vminfo-parser
+
+Any issues with this program can still be reported in this repo as it is still actively monitored. Changes will go into the rhtools org first
+
+
 # Description
 
 The `vm_csv_parser.py` is intended to take a CSV file and parse it creating both text tables and graphs using `matplotlib` and `pandas`. The primary purpose is to help construct reports around OpenShift Virtualization. As such things like `supported operating systems` and `disk space ranges` are based on the current understanding of both support and difficulty to migrate as of the publishing on this script in July 2024.
