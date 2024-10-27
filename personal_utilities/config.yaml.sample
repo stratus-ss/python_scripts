@@ -1,0 +1,15 @@
+# These do not need to be updated frequently
+api-url: "https://api.gamedev.tv/api"
+base-url: "https://www.gamedev.tv"
+login-url: "https://www.gamedev.tv/login"
+
+# Change these values
+username: "example@example.com"
+password: "super-secret"
+course-url: "https://www.gamedev.tv/dashboard/courses/25"
+token: "11111|xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Do you need to generate a new token?
+refresh-token: False
+# By when set to False, title will be Chapter_{num}-{Chapter Title}-{Video Title}
+# Set to true {Course Title}-Chapter_{num}-{Chapter Title}-{Video Title}
+add-course-title-to-video: False
